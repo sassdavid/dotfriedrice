@@ -49,10 +49,10 @@ supported Linux distro.*
 
 #### Why niri and not XYZ?
 
-It's resource efficient, lightning fast, infinitely tweakable, intuitively
-handles scrolling / tiling / floating windows, integrates awesomely with
-multiple monitors, actively developed, well thought out, has great
-documentation and the author is very helpful.
+It's resource efficient, extremely stable, lightning fast, infinitely
+tweakable, intuitively handles scrolling / tiling / floating windows,
+integrates awesomely with multiple monitors, actively developed, well thought
+out, has great documentation and the author is very helpful.
 
 niri feels like a perfect match and I wanted to make a special call out because
 it's *that* good. I'm the "I was there 3,000 years ago" meme from Windows 2000,
@@ -89,11 +89,11 @@ include screenshots in 1 spot.
 
 ### Tokyonight Moon
 
-![Tokyonight Moon](./.github/screenshots/tokyonight-moon.jpg)
+![Tokyonight Moon](./themes/tokyonight-moon/_preview.jpg)
 
 ### Gruvbox Dark (Medium)
 
-![Gruvbox Dark Medium](./.github/screenshots/gruvbox-dark-medium.jpg)
+![Gruvbox Dark Medium](./themes/gruvbox-dark-medium/_preview.jpg)
 
 I prefer using themes that have good contrast ratios and are clear to see in
 video recordings. These dotfiles currently support easily switching between
@@ -105,19 +105,9 @@ JetBrainsMono NF which these dotfiles install for you.
 
 ### Setting a theme
 
-These dotfiles include a `dot-theme-set` script that you can run from your
-terminal to set your theme to any of the themes listed above.
-
-You can look in the [themes/](./themes/) directory to see which apps are themed
-and [add additional apps](#how-to-theme-custom-apps) too.
-
-If you don't like the included themes that's no problem. You can [add custom
-themes](#how-to-add-custom-themes) and remove the defaults.
-
-After installing these dotfiles you can switch themes with:
-
 ```sh
 # Get a full list of themes by running: dot-theme-set --list
+# There's also a --menu flag to preview themes in the desktop environment.
 #
 # Optionally you can skip adding a theme name and the next theme will be picked.
 dot-theme-set THEME_NAME
@@ -129,18 +119,26 @@ have a bunch of shells already open you can run the `SZ` (source zsh) alias to s
 *Not all terminals are supported, if yours didn't change then check [theming
 custom apps](#how-to-theme-custom-apps).*
 
+You can look in the [themes/](./themes/) directory to see which apps are themed
+and [add additional apps](#how-to-theme-custom-apps) too. If you don't like the
+included themes that's no problem. You can [add custom
+themes](#how-to-add-custom-themes) and remove the defaults.
+
 ### Wallpapers
 
 *Only available when the desktop environment is set up.*
 
+```sh
+# Get a full list of wallpapers by running: dot-theme-set-bg --list
+# There's also a --menu flag to preview wallpapers.
+#
+# Optionally you can skip adding a wallpaper name and the next wallpaper will be picked.
+dot-theme-set-bg WALLPAPER_NAME
+```
+
 You can cycle between wallpapers that are compatible with the active theme.
 This is controlled through the `_theme.json` file in each theme's directory,
 it's under the `wallpaper.synergy` object.
-
-```sh
-# Set the next wallpaper.
-dot-theme-set-bg
-```
 
 ## ✨ Quickly Get Set Up
 
@@ -306,7 +304,7 @@ in various directories of this dotfiles repo. These have long Windows paths and
 are in the `mnt/c/` directory.
 
 It would be expected that you copy those over to your system while replacing
-"sassd" with your Windows user name if you want to use those things.  The
+"sassd" with your Windows user name if you want to use those things. The
 Microsoft Terminal config will automatically be copied over to your user's
 path.
 
@@ -520,6 +518,7 @@ space to toggle checkboxes.*
 - **Additional packages**:
   - I suggest installing `neovim` to maybe edit the dotfiles `install-config` before you run it
     - This isn't extra bloat since these dotfiles install `neovim` by default
+    - You can type `/neovim` to search for it and hit enter to choose it
 - **Timezone**:
   - Pick what makes sense for your location
 - **Automatic time sync (NTP)**:
@@ -534,7 +533,7 @@ going to happen. Triple check your drive being formatted is the correct one
 and everything else looks good!
 
 - Sit back and relax while everything gets installed for ~5-10 minutes
-- Choose "no" when it prompts you to chroot into the installation
+- Choose "Exit archinstall" when it prompts you after it has finished
 - Remove the USB drive from your computer
 - Run `reboot`
 - Configure your BIOS to boot from the drive you just installed Arch on

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Set a theme by name, if omit then the next theme in the list will be set.
+# Set a theme.
 #
 # Examples:
-#   dot-theme-set --list
-#   dot-theme-set NAME
-#   dot-theme-set
+#   dot-theme-set --list     # print available themes
+#   dot-theme-set --menu     # pick from available themes
+#   dot-theme-set NAME       # provide a specific theme
+#   dot-theme-set            # pick the next available theme
 
 set -o errexit
 set -o pipefail
@@ -15,14 +16,17 @@ set -o nounset
 
 mapfile -t ALL_THEMES < <(find "${DOTFILES_PATH}/themes" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
 
-THEME="${1:-}"
+ARG="${1:-}"
 
-if [ "${THEME}" = "--list" ]; then
+if [ "${ARG}" = "--list" ]; then
   printf "%s\n" "${ALL_THEMES[@]}"
+  exit
+elif [ "${ARG}" = "--menu" ]; then
+  walker --provider menus:themes
   exit
 fi
 
-if [ -z "${THEME}" ]; then
+if [ -z "${ARG}" ]; then
   ACTIVE_THEME_PATH="${XDG_CONFIG_HOME}/fzf/theme.sh"
   CURRENT_THEME=
 
@@ -31,16 +35,16 @@ if [ -z "${THEME}" ]; then
   fi
 
   # Pick the first theme as a default.
-  THEME="${ALL_THEMES[0]}"
+  ARG="${ALL_THEMES[0]}"
 
   # Find the next theme, wrap back to the first one if at the end of the list.
   # Using ! ensures this returns an index (0, 1, etc.) instead of the name.
   for i in "${!ALL_THEMES[@]}"; do
     if [[ "${ALL_THEMES[${i}]}" = "${CURRENT_THEME}" ]]; then
-      THEME="${ALL_THEMES[(i + 1)%${#ALL_THEMES[@]}]}"
+      ARG="${ALL_THEMES[(i + 1)%${#ALL_THEMES[@]}]}"
       break
     fi
   done
 fi
 
-set_theme "${THEME}"
+set_theme "${ARG}"
