@@ -2668,7 +2668,7 @@ install_mise() {
     if [[ -t 0 ]]; then
       eval "$("${HOME}/.local/bin/mise" activate "$shell_name")"
     else
-      eval "$("${HOME}/.local/bin/mise" activate --shims)"
+      eval "$("${HOME}/.local/bin/mise" activate "$shell_name" --shims)"
     fi
   fi
 

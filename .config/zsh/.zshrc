@@ -45,7 +45,7 @@ if type "${HOME}/.local/bin/mise" &>/dev/null; then
   if [[ -t 0 ]]; then
     eval "$("${HOME}/.local/bin/mise" activate "$SHELL_NAME")"
   else
-    eval "$("${HOME}/.local/bin/mise" activate --shims)"
+    eval "$("${HOME}/.local/bin/mise" activate "$SHELL_NAME" --shims)"
   fi
 fi
 eval "$("${HOME}/.local/bin/mise" hook-env)"
