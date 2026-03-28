@@ -1116,6 +1116,30 @@ _config_install_display() {
   done
 }
 
+_theme_download() {
+  local theme_name="${1}"
+  local url="${2}"
+  local internal_directory_name="${3}"
+
+  local zip_file_name=
+  zip_file_name="$(basename "${url}" .zip)"
+
+  local zip_path="/tmp/${theme_name}.zip"
+  local theme_path="${XDG_DATA_HOME}/themes/${theme_name}"
+
+  if [ -d "${theme_path}" ]; then
+    echo "Skipping, since '${theme_name}' is already installed, delete it to reinstall or update"
+  else
+    rm -rf "${zip_path}" "/tmp/${zip_file_name}"
+    curl -fsSL "${url}" -o "${zip_path}"
+    unzip -q "${zip_path}" -d "/tmp"
+    mv "/tmp/${zip_file_name}/${internal_directory_name}" "${theme_path}"
+    rm -rf "${zip_path}" "/tmp/${zip_file_name}"
+
+    echo "'${theme_name}' has been installed"
+  fi
+}
+
 # -----------------------------------------------------------------------------
 # Main functions
 # -----------------------------------------------------------------------------
@@ -1493,6 +1517,7 @@ create_initial_dirs() {
     mkdir -p \
       "${XDG_CACHE_HOME}/mpd" \
       "${XDG_CONFIG_HOME}/fontconfig" \
+      "${XDG_CONFIG_HOME}/gtk-4.0" \
       "${XDG_CONFIG_HOME}/hypr" \
       "${XDG_CONFIG_HOME}/mako" \
       "${XDG_CONFIG_HOME}/mpd" \
@@ -1509,6 +1534,7 @@ create_initial_dirs() {
       "${XDG_CONFIG_HOME}/xarchiver" \
       "${XDG_CONFIG_HOME}/zathura" \
       "${XDG_DATA_HOME}/applications" \
+      "${XDG_DATA_HOME}/themes" \
       "${XDG_DESKTOP_DIR}" \
       "${XDG_DOCUMENTS_DIR}" \
       "${XDG_DOWNLOAD_DIR}" \
@@ -1784,6 +1810,27 @@ EOF
   fi
 }
 
+install_gui_themes() {
+  _info "INSTALL GUI THEMES"
+
+  if [ "${GUI_ENABLED}" != "1" ]; then
+    echo "Skipping, since this only runs on Linux when GUI_LINUX=1 is set"
+    return
+  fi
+
+  _theme_download \
+    "tokyonight-moon" \
+    "https://github.com/user-attachments/files/26270035/Tokyonight-BL-LB-dark-Moon.zip" \
+    "Tokyonight-BL-LB-Dark-Moon"
+
+  _theme_download \
+    "gruvbox-dark-medium" \
+    "https://github.com/user-attachments/files/26270135/Gruvbox-BL-LB-dark-Medium.zip" \
+    "Gruvbox-BL-LB-Dark-Medium"
+
+  printf "\nThey were installed to '%s'\n" "${XDG_DATA_HOME}/themes/"
+}
+
 install_zsh_plugins() {
   _info "INSTALL ZSH PLUGINS"
 
@@ -1944,7 +1991,7 @@ configure_systemd_services() {
     [[ " ${flags[*]} " == *" --user"* ]] || prefix=(sudo)
 
     if systemctl cat "${flags[@]}" "${service}" 1>/dev/null; then
-      "${prefix[@]}" systemctl "${flags[@]}" enable "${service}"
+      "${prefix[@]}" systemctl "${flags[@]}" enable "${service}" 1>/dev/null
       echo "'${service}' has been enabled"
     fi
   done
@@ -2115,13 +2162,6 @@ alias fgrep="fgrep -G"
 alias egrep="egrep -G"
 EOF
     fi
-
-    if ! grep -q '^alias outdated="brew update' "${aliases_path}" 2>/dev/null; then
-      cat <<EOF >>"${aliases_path}"
-
-alias outdated="brew update --quiet && brew outdated --formula && print '\n' && brew outdated --casks"
-EOF
-    fi
   else
     if ! grep -q 'alias grep="grep --color=auto"' "${aliases_path}" 2>/dev/null; then
       cat <<EOF >>"${aliases_path}"
@@ -2130,22 +2170,6 @@ alias grep="grep --color=auto"
 alias fgrep="fgrep --color=auto"
 alias egrep="egrep --color=auto"
 EOF
-    fi
-
-    if [ "${OS_DISTRO}" == "arch" ]; then
-      if ! grep -q '^alias outdated="checkupdates' "${aliases_path}" 2>/dev/null; then
-        cat <<EOF >>"${aliases_path}"
-
-alias outdated="checkupdates && printf '\n\n' && yay -Qua"
-EOF
-      fi
-    elif [ "${OS_DISTRO}" == "debian" ]; then
-      if ! grep -q '^alias outdated="sudo apt-get update -qq' "${aliases_path}" 2>/dev/null; then
-        cat <<EOF >>"${aliases_path}"
-
-alias outdated="sudo apt-get update -qq && apt list --upgradable"
-EOF
-      fi
     fi
 
     # Is a Linux GUI supported?
@@ -2565,6 +2589,28 @@ set_theme() {
     ln -fns "${DOTFILES_PATH}/themes/${theme}/waybar.css" "${XDG_CONFIG_HOME}/waybar/theme.css"
     ln -fns "${DOTFILES_PATH}/themes/${theme}/zathurarc" "${XDG_CONFIG_HOME}/zathura/themerc"
 
+    local gtk_theme_path="${XDG_DATA_HOME}/themes/${theme}"
+
+    if [ -d "${gtk_theme_path}" ]; then
+      ln -fns "${gtk_theme_path}/gtk-4.0/assets" "${XDG_CONFIG_HOME}/gtk-4.0/assets"
+      ln -fns "${gtk_theme_path}/gtk-4.0/gtk.css" "${XDG_CONFIG_HOME}/gtk-4.0/gtk.css"
+
+      local gtk_theme_settings_path="${DOTFILES_PATH}/themes/${theme}/gtk.ini"
+
+      if [ -f "${gtk_theme_settings_path}" ]; then
+        ln -fns "${gtk_theme_settings_path}" "${XDG_CONFIG_HOME}/gtk-3.0/settings.ini"
+        ln -fns "${gtk_theme_settings_path}" "${XDG_CONFIG_HOME}/gtk-4.0/settings.ini"
+      fi
+
+      # This command works as a source of truth for GTK-3 and GTK-4 apps.
+      # Given niri highly suggests installing xdg-desktop-portal-gnome, this
+      # comes with glib2 which provides gsettings.
+      #
+      # Even after symlinking settings.ini, gsettings still needs to run to
+      # switch the active theme so it takes effect.
+      gsettings set org.gnome.desktop.interface gtk-theme "${theme}"
+    fi
+
     [ -n "${switch_wallpaper}" ] && "${DOTFILES_PATH}/.local/bin/dot-theme-set-bg"
   fi
 
@@ -2935,22 +2981,27 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   [[ "${BOOTSTRAP}" == "1" && "${IN_CONTAINER}" != "1" ]] && bootstrap && exit
 
   parse_args "${@}"
-  detect_env
-  detect_and_prepare_gpu
-  detect_and_prepare_network
-  detect_and_prepare_bluetooth
-  warn_root
+
+  if [ "${PULL}" != "1" ]; then
+    detect_env
+    detect_and_prepare_gpu
+    detect_and_prepare_network
+    detect_and_prepare_bluetooth
+    warn_root
+  fi
+
   update_dotfiles "${@}"
-  check_install_config
 
   [ "${PULL}" == "1" ] && exit
 
+  check_install_config
   check_prereqs
   create_initial_dirs
   install_mise
   install_packages
   clone_dotfiles
   install_fonts
+  install_gui_themes
   install_mongodb_tools
   install_zsh_plugins
   create_configs

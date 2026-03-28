@@ -113,8 +113,9 @@ JetBrainsMono NF which these dotfiles install for you.
 dot-theme-set THEME_NAME
 ```
 
-When switching themes most terminal apps will update automatically, but if you
-have a bunch of shells already open you can run the `SZ` (source zsh) alias to source new theme related configs.
+When switching themes all GTK apps will live update (Thunar, Firefox, GIMP,
+etc.) and most terminal apps will live update too. If you have a bunch of
+shells already open you can run the `SZ` (source zsh) alias to source new theme related configs.
 
 *Not all terminals are supported, if yours didn't change then check [theming
 custom apps](#how-to-theme-custom-apps).*
