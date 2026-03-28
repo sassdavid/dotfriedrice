@@ -13,7 +13,7 @@ lint() {
   fi
 
   if ! command -v ruff >/dev/null 2>&1; then
-    local ruff_cmd=(docker container run --rm -i -v "${PWD}:/io" -u "$(id -u):$(id -g)" ghcr.io/astral-sh/ruff:0.14.9)
+    local ruff_cmd=(docker container run --rm -i -v "${PWD}:/io" -u "$(id -u):$(id -g)" ghcr.io/astral-sh/ruff:0.15.8)
   fi
 
   find . -type f \
@@ -36,12 +36,11 @@ format() {
   fi
 
   if ! command -v ruff >/dev/null 2>&1; then
-    local ruff_cmd=(docker container run --rm -i -v "${PWD}:/io" -u "$(id -u):$(id -g)" ghcr.io/astral-sh/ruff:0.14.9)
+    local ruff_cmd=(docker container run --rm -i -v "${PWD}:/io" -u "$(id -u):$(id -g)" ghcr.io/astral-sh/ruff:0.15.8)
   fi
 
   local shfmt_args=("--write")
 
-  local arg
   for arg in "${@}"; do
     [ "${arg}" == "--check" ] && shfmt_args+=("--diff")
 
