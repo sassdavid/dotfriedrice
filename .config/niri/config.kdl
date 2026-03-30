@@ -139,7 +139,7 @@ binds {
     // Overview.
     Mod+Grave          hotkey-overlay-title="System menu" { spawn "dot-menu"; }
     Mod+Slash          hotkey-overlay-title="Search niri keybinds" { spawn "walker" "--height" "980" "--width" "980" "--provider" "menus:keybinds"; }
-    Mod+Shift+Slash    hotkey-overlay-title="Search niri actions" { spawn "walker" "--height" "980" "--width" "800" "--provider" "niriactions"; }
+    Mod+Shift+Slash    hotkey-overlay-title="Search niri actions" { spawn "walker" "--height" "980" "--width" "980" "--provider" "niriactions"; }
     Mod+Ctrl+Slash     hotkey-overlay-title="Search Waybar actions" { spawn "walker" "--height" "980" "--width" "800" "--provider" "menus:waybar"; }
     Mod+O repeat=false hotkey-overlay-title="Toggle overview (4-finger swipe)" { toggle-overview; }
 
@@ -198,6 +198,7 @@ binds {
     Mod+Alt+Shift+T      hotkey-overlay-title="Terminal (floating)" { spawn "ghostty" "--class=dot.floating.ghostty"; }
     Mod+Alt+F            hotkey-overlay-title="File manager" { spawn "thunar"; }
     Mod+Alt+Shift+F      hotkey-overlay-title="File manager (floating)" { spawn "thunar" "--name=dot.floating.thunar"; }
+    Mod+Alt+N            hotkey-overlay-title="Notes" { spawn "dot-launch-or-focus-tui" "notes"; }
     Mod+Alt+P            hotkey-overlay-title="Passwords" { spawn "dot-launch-or-focus" "keepassxc"; }
     Mod+Alt+M            hotkey-overlay-title="Music" { spawn "dot-launch-or-focus-tui" "rmpc"; }
     Mod+Alt+B            hotkey-overlay-title="Browser" { spawn "firefox"; }
