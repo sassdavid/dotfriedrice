@@ -26,7 +26,7 @@ Everyone is welcome here and you have full control.
 
 ## 🎁 What's in the Box?
 
-### Command Line
+### Command line
 
 *Supports Arch Linux, Debian, Ubuntu and macOS. It also supports WSL 2 for any
 supported Linux distro.*
@@ -37,7 +37,7 @@ supported Linux distro.*
   - Fully configure Neovim
   - Install modern CLI tools and programming languages
 
-### (Optional) Scrolling / Tiling Desktop Environment
+### (Optional) Scrolling / tiling desktop environment
 
 *Supports Arch Linux.*
 
@@ -60,7 +60,7 @@ XP, 7, 10 and also macOS on company issued laptops. Nothing I have ever used in
 ~25 years has approached how I feel using this set up. It's not even close (yes
 I tried Hyprland too).
 
-### Full Package List
+### Full package list
 
 There's docs with a [complete list of packages](./docs/packages.md) along with
 what they're being used for and why.
