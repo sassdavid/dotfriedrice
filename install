@@ -132,7 +132,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
       "gimp"
       "grim"
       "hyprpicker"
-      "iptables-nft"
+      "iptables"
       "kdenlive"
       "keepassxc"
       "lact"
@@ -171,6 +171,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
       "xarchiver"
       "xdg-desktop-portal-gnome"
       "xdg-desktop-portal-gtk"
+      "xdg-utils"
       "xwayland-satellite"
       "zathura"
       "zathura-djvu"
@@ -705,10 +706,10 @@ OS_TYPE="$(uname | tr "[:upper:]" "[:lower:]")"
 OS_DISTRO=
 OS_IN_WSL=
 
-C_RED="\e[0;31;1m"
-C_GREEN="\e[0;32;1m"
-C_CYAN="\e[0;36;1m"
-C_RESET="\e[0m"
+C_RED=$'\e[1;31;1m'
+C_GREEN=$'\e[1;32;1m'
+C_CYAN=$'\e[1;36;1m'
+C_RESET=$'\e[0m'
 
 # Do we want GUI support? GUI_ENABLED will get set based on multiple conditions.
 GUI_LINUX="${GUI_LINUX:-}"
@@ -731,6 +732,39 @@ _error() {
 _info() {
   local message="${1:-}"
   printf "\n\n%b%s:%b\n\n" "${C_CYAN}" "${message}" "${C_RESET}"
+}
+
+_curl() {
+  local url="${1}"
+
+  # Attempt to make all curl commands more resilient to failure. The speed
+  # flags help protect against zombie connections while still allowing long
+  # downloads on slower connections (avoiding --max-time).
+  #
+  # At the same time, let stderr get printed in real-time. If errors occur,
+  # producee a final error message so folks know we cannot continue.
+  #
+  # Pass in any custom flags after the URL, such as -o to write files to disk.
+  local args=(
+    "--silent"
+    "--show-error"
+    "--fail"
+    "--location"
+    "--connect-timeout" "10"
+    "--retry" "4"
+    "--retry-all-errors"
+    "--speed-limit" "100"
+    "--speed-time" "30"
+  )
+
+  args+=("${@}")
+
+  if ! curl "${args[@]}"; then
+    local message="'${url}' didn't respond successfully, retry or check your connection, aborting!"
+
+    printf "%bERROR: %s%b\n\n" "${C_RED}" "${message}" "${C_RESET}" >&2
+    return 1
+  fi
 }
 
 _find_pwsh() {
@@ -850,7 +884,7 @@ Please install any comparable packages on your own, you can view the list at:
 
 Then re-run this script and explicitly skip installing system packages:
 
-    bash <(curl -sS https://raw.githubusercontent.com/${DOTFILES_REPO_SLUG}/${DOTFILES_BRANCH}/install) --skip-system-packages
+    bash <(_curl https://raw.githubusercontent.com/${DOTFILES_REPO_SLUG}/${DOTFILES_BRANCH}/install) --skip-system-packages
 EOF
 
   exit 1
@@ -955,7 +989,7 @@ _install_packages_arch() {
     if [ ! -f "${gegl_plugins_path}/gegleffectspending.so" ]; then
       echo
       rm -rf "${gegl_zip_path}"
-      curl -fsSL "https://github.com/LinuxBeaver/Gimp_Layer_Effects_Text_Styler_Plugin_GEGL_Effects/releases/download/Continual_July22_2023/gegl_effects_linux_binaries_gegl_plugin.zip" -o "${gegl_zip_path}"
+      _curl "https://github.com/LinuxBeaver/Gimp_Layer_Effects_Text_Styler_Plugin_GEGL_Effects/releases/download/Continual_July22_2023/gegl_effects_linux_binaries_gegl_plugin.zip" -o "${gegl_zip_path}"
       mkdir -p "${gegl_plugins_path}"
       unzip "${gegl_zip_path}" -d "${gegl_plugins_path}"
       rm -rf "${gegl_zip_path}"
@@ -1149,7 +1183,7 @@ _theme_download() {
     echo "Skipping, since '${theme_name}' is already installed, delete it to reinstall or update"
   else
     rm -rf "${zip_path}" "/tmp/${zip_file_name}"
-    curl -fsSL "${url}" -o "${zip_path}"
+    _curl "${url}" -o "${zip_path}"
     unzip -q "${zip_path}" -d "/tmp"
     mv "/tmp/${zip_file_name}/${internal_directory_name}" "${theme_path}"
     rm -rf "${zip_path}" "/tmp/${zip_file_name}"
@@ -1179,9 +1213,9 @@ bootstrap() {
       exit 1
     fi
   else
-    curl -sSL "https://raw.githubusercontent.com/${DOTFILES_REPO_SLUG}/${DOTFILES_BRANCH}/install" \
+    _curl "https://raw.githubusercontent.com/${DOTFILES_REPO_SLUG}/${DOTFILES_BRANCH}/install" \
       -o "${BOOTSTRAP_PATH}/install"
-    curl -sSL "https://raw.githubusercontent.com/${DOTFILES_REPO_SLUG}/${DOTFILES_BRANCH}/install-config.example" \
+    _curl "https://raw.githubusercontent.com/${DOTFILES_REPO_SLUG}/${DOTFILES_BRANCH}/install-config.example" \
       -o "${BOOTSTRAP_PATH}/install-config.example"
   fi
 
@@ -1524,7 +1558,6 @@ create_initial_dirs() {
     "${XDG_CONFIG_HOME}/fzf" \
     "${XDG_CONFIG_HOME}/ghostty" \
     "${XDG_CONFIG_HOME}/git" \
-    "${XDG_CONFIG_HOME}/gitui" \
     "${XDG_CONFIG_HOME}/gnupg" \
     "${XDG_CONFIG_HOME}/tmux/plugins" \
     "${XDG_CONFIG_HOME}/zsh" \
@@ -1753,7 +1786,7 @@ clone_dotfiles() {
 
   [[ -z "${dotfiles_path}" ]] && dotfiles_path="${default_dotfiles_path}"
 
-  DOTFILES_PATH="${dotfiles_path//\~/"${HOME}"}"
+  DOTFILES_PATH="${dotfiles_path/#~/"${HOME}"}"
 
   _local_clone && return 0
 
@@ -1795,7 +1828,7 @@ install_fonts() {
     echo "Skipping, since fonts are already installed at '${font_path}'"
   else
     rm -rf "${font_zip}" "${font_tmp}"
-    curl -sSL "${font_url}" -o "${font_zip}"
+    _curl "${font_url}" -o "${font_zip}"
     unzip "${font_zip}" -d "${font_tmp}"
 
     if [ "${OS_IN_WSL}" == "1" ]; then
@@ -1904,9 +1937,9 @@ install_external_scripts() {
     installed_version=$(${version_command} 2>/dev/null || true)
 
     if [[ -z "${installed_version}" || "${installed_version}" != "${tag}" ]]; then
-      if curl -fsSL "${url}" -o "${HOME}/.local/bin/${script}"; then
+      if _curl "${url}" -o "${HOME}/.local/bin/${script}"; then
         chmod +x "${HOME}/.local/bin/${script}"
-      fi || true
+      fi
 
       echo "Installed '${script}' version ${tag}"
     else
@@ -2655,7 +2688,6 @@ set_theme() {
   ln -fns "${DOTFILES_PATH}/themes/${theme}/eza.yml" "${XDG_CONFIG_HOME}/eza/theme.yml"
   ln -fns "${DOTFILES_PATH}/themes/${theme}/fzf.sh" "${XDG_CONFIG_HOME}/fzf/theme.sh"
   ln -fns "${DOTFILES_PATH}/themes/${theme}/ghostty" "${XDG_CONFIG_HOME}/ghostty/theme"
-  ln -fns "${DOTFILES_PATH}/themes/${theme}/gitui.ron" "${XDG_CONFIG_HOME}/gitui/theme.ron"
   ln -fns "${DOTFILES_PATH}/themes/${theme}/k9s.yaml" "${XDG_CONFIG_HOME}/k9s/skins/theme.yaml"
   ln -fns "${DOTFILES_PATH}/themes/${theme}/nvim.lua" "${XDG_CONFIG_HOME}/nvim/lua/plugins/theme.lua"
   ln -fns "${DOTFILES_PATH}/themes/${theme}/tmux.conf" "${XDG_CONFIG_HOME}/tmux/theme.conf"
@@ -2985,8 +3017,7 @@ parse_args() {
     SKIP_SYSTEM_PACKAGES=1
     ;;
   --help | -h)
-    echo -e "$(
-      cat <<EOF
+    cat <<EOF
   Usage examples:
 
   # Run the install script based on the local copy of your dotfiles
@@ -3044,7 +3075,6 @@ parse_args() {
   # Show this help menu.
   ${C_GREEN}./install --help${C_RESET}
 EOF
-    )"
     exit
     ;;
   *)

@@ -17,7 +17,7 @@ installed in these environments.*
 | base-devel     | Basic tools to build Arch Linux packages                      |
 | bluez          | Daemons for the bluetooth protocol stack                      |
 | dnsmasq        | Lightweight, easy to configure DNS forwarder and DHCP server  |
-| iptables-nft   | Linux kernel packet control tool (using nft interface)        |
+| iptables       | Linux kernel packet control tool (using nft interface)        |
 | iwd            | Internet Wireless Daemon                                      |
 | lact           | Linux GPU Configuration Tool (supports AMD, NVIDIA and Intel) |
 | libvirt        | API for controlling virtualization engines (kvm,qemu,etc)     |
@@ -119,6 +119,7 @@ If needed, these get automatically installed for you by these dotfiles.
 | wlrctl *(AUR)*           | Utility for miscellaneous wlroots extensions            |
 | xdg-desktop-portal-gnome | GNOME backend for xdg-desktop-portal                    |
 | xdg-desktop-portal-gtk   | GTK backend for xdg-desktop-portal                      |
+| xdg-utils                | Assist applications with desktop integration tasks      |
 | xwayland-satellite       | Xwayland outside your Wayland                           |
 
 ## Launcher
