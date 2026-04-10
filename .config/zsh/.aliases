@@ -33,9 +33,6 @@ alias cfgb='${EDITOR} ${XDG_CONFIG_HOME}/git/config.local.bitbucket'
 
 alias vss='sort -u ${XDG_CONFIG_HOME}/nvim/spell/en.utf-8.add -o ${XDG_CONFIG_HOME}/nvim/spell/en.utf-8.add'
 alias vdt='rm ${XDG_STATE_HOME}/nvim/swap/%*'
-alias ctg="fd -HItd -E .git -E .idea '\.terragrunt-cache' -x rm -rf"
-alias ctf="fd -HItd -E .git -E .idea -E .terragrunt-cache '\.terraform' -x rm -rf"
-alias ctfl="fd -HIptf -E .git -E .idea -E .terragrunt-cache -e hcl './terraform-aws-loxon.*/\.terraform.lock.hcl' -x rm -rf"
 alias cnode="fd -Iptd '.*/node_modules$|.*/build$|.*/dist$' -x rm -rf"
 alias cng="fd -HIptd '.*/.angular/cache$' -x rm -rf"
 

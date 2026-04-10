@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# Move a git tag from its current commit to HEAD (latest commit).
+# If no tag is provided, an interactive fzf picker is shown.
+#
+# Handles both lightweight and annotated tags. Use --push to also update
+# the remote after moving the tag locally.
+#
+# Examples:
+#   gtm                  # pick a tag interactively with fzf
+#   gtm 2.1.0            # move tag 2.1.0 to HEAD
+#   gtm 2.1.0 --push     # move and also update the remote
+#   gtm 2.1.0 --dry-run  # show what would happen without making changes
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+tag=""
+dry_run=false
+push_remote=false
+
+for arg in "${@}"; do
+  case "${arg}" in
+  --dry-run) dry_run=true ;;
+  --push) push_remote=true ;;
+  --*)
+    echo "Unknown flag: ${arg}" >&2
+    exit 1
+    ;;
+  *) tag="${arg}" ;;
+  esac
+done
+
+# Show fzf picker if no tag provided.
+if [ -z "${tag}" ]; then
+  tag="$(
+    git tag --sort=-version:refname |
+      fzf \
+        --border \
+        --border-label " [ Enter: Move to HEAD | ESC: Cancel ] " \
+        --preview "git show --stat --color=always {1} | head -30; echo; git log --oneline --color=always -5 {1}" \
+        --preview-window="right:60%" || true
+  )"
+fi
+
+[ -z "${tag}" ] && {
+  echo "No tag selected, aborting."
+  exit 0
+}
+
+# Verify the tag exists.
+if ! git tag --list | grep -qxF "${tag}"; then
+  echo "Error: tag '${tag}' does not exist." >&2
+  exit 1
+fi
+
+# Detect if this is an annotated tag so we can preserve its message.
+# Use contents:subject + contents:body to exclude any embedded SSH/GPG signature.
+tag_type="$(git cat-file -t "refs/tags/${tag}")"
+tag_message=""
+if [ "${tag_type}" = "tag" ]; then
+  tag_subject="$(git for-each-ref --format='%(contents:subject)' "refs/tags/${tag}")"
+  tag_body="$(git for-each-ref --format='%(contents:body)' "refs/tags/${tag}")"
+  tag_message="${tag_subject}"
+  [ -n "${tag_body}" ] && tag_message="${tag_message}"$'\n\n'"${tag_body}"
+fi
+
+current_commit="$(git rev-parse HEAD)"
+old_commit="$(git rev-list -n 1 "refs/tags/${tag}")"
+
+echo "Tag:        ${tag} (${tag_type})"
+echo "From:       $(git log --oneline -1 "${old_commit}")"
+echo "To:         $(git log --oneline -1 "${current_commit}")"
+
+if [ "${dry_run}" = "true" ]; then
+  echo ""
+  echo "[dry-run] Would move tag '${tag}' to HEAD."
+  [ "${push_remote}" = "true" ] && echo "[dry-run] Would also delete and re-push the tag on the remote."
+  exit 0
+fi
+
+echo ""
+
+# Delete the existing tag and recreate it at HEAD.
+git tag --delete "${tag}"
+
+if [ "${tag_type}" = "tag" ]; then
+  if [ -n "${tag_message}" ]; then
+    # Preserve the original annotation message.
+    git tag --annotate --message="${tag_message}" "${tag}"
+  else
+    # Annotated tag with no message (e.g. signed with -m "").
+    # -F /dev/null reads an empty message from /dev/null — the only
+    # portable way to create a no-message annotated tag across git versions.
+    git tag --annotate -F /dev/null "${tag}"
+  fi
+else
+  git tag "${tag}"
+fi
+
+echo "Moved '${tag}' to HEAD."
+
+# Optionally delete the remote tag and push the new one.
+if [ "${push_remote}" = "true" ]; then
+  remote="$(git remote | head -1)"
+  if [ -z "${remote}" ]; then
+    echo "No remote found, skipping remote update."
+    exit 0
+  fi
+  echo "Updating remote '${remote}'..."
+  git push "${remote}" ":refs/tags/${tag}" 2>/dev/null || true
+  git push "${remote}" "${tag}"
+  echo "Remote updated."
+fi
