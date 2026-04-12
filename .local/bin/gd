@@ -18,7 +18,7 @@ GIT_ARGS=("--color=always")
 # Handle displaying side by side on demand.
 for arg in "${@}"; do
   if [ "${arg}" = "--side" ]; then
-    export DELTA_FEATURES="${DELTA_FEATURES} side-by-side"
+    export DELTA_FEATURES="${DELTA_FEATURES:-} side-by-side"
   else
     GIT_ARGS+=("${arg}")
   fi
@@ -29,4 +29,4 @@ printf -v GIT_ARGS_STR "%q " "${GIT_ARGS[@]}"
 git diff "${GIT_ARGS[@]}" --name-only |
   fzf \
     --preview "git diff ${GIT_ARGS_STR:-} -- {-1} | delta --width=\${FZF_PREVIEW_COLUMNS}" \
-    --preview-window="right,75%" || true
+    --preview-window="right:75%" || true

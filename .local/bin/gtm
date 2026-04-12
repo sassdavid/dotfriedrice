@@ -36,7 +36,7 @@ if [ -z "${tag}" ]; then
   tag="$(
     git tag --sort=-version:refname |
       fzf \
-        --border \
+        --border=top \
         --border-label " [ Enter: Move to HEAD | ESC: Cancel ] " \
         --preview "git show --stat --color=always {1} | head -30; echo; git log --oneline --color=always -5 {1}" \
         --preview-window="right:60%" || true
