@@ -6,9 +6,9 @@ input=$(cat)
 eval "$(echo "$input" | jq -r '
   @sh "MODEL=\(.model.display_name)",
   @sh "CURRENT_DIR=\(.workspace.current_dir)",
+  @sh "SESSION_ID=\(.session_id // "default")",
   @sh "COST_TOTAL=\(.cost.total_cost_usd // 0)",
   @sh "DURATION_MS=\(.cost.total_duration_ms // 0)",
-  @sh "API_DURATION_MS=\(.cost.total_api_duration_ms // 0)",
   @sh "LINES_ADDED=\(.cost.total_lines_added // 0)",
   @sh "LINES_REMOVED=\(.cost.total_lines_removed // 0)",
   @sh "CONTEXT_SIZE=\(.context_window.context_window_size // 0)",
@@ -23,15 +23,15 @@ RED='\033[31m'
 DIM='\033[2m'
 RESET='\033[0m'
 
-# --- Git info with cache (refreshes every 5s) ---
+# --- Git info with cache (refreshes every 5s, scoped per session) ---
 
-CACHE_FILE="/tmp/statusline-git-cache"
+CACHE_FILE="/tmp/statusline-git-cache-$SESSION_ID"
 CACHE_MAX_AGE=5
 
 cache_is_stale() {
   [ ! -f "$CACHE_FILE" ] ||
     # stat -f %m is macOS, stat -c %Y is Linux
-    [ $(($(date +%s) - $(stat -f %m "$CACHE_FILE" 2>/dev/null || stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0))) -gt $CACHE_MAX_AGE ]
+    [ $(($(date +%s) - $(stat -f %m "$CACHE_FILE" 2>/dev/null || stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0))) -gt "$CACHE_MAX_AGE" ]
 }
 
 if cache_is_stale; then
@@ -62,13 +62,14 @@ echo -e "${CYAN}[${MODEL}]${RESET} ${CURRENT_DIR##*/}${GIT_INFO}"
 PCT=${USED_PCT%.*}
 : "${PCT:=0}"
 
-# Color-coded progress bar based on context usage
-# 0-40% green (normal), 40-60% yellow (warning), 60%+ red (compaction zone)
-if [ "$PCT" -ge 60 ]; then
+# Color-coded progress bar: green <70%, yellow 70-89%, red 90%+
+if [ "$PCT" -ge 90 ]; then
   BAR_COLOR="$RED"
-elif [ "$PCT" -ge 40 ]; then
+elif [ "$PCT" -ge 70 ]; then
   BAR_COLOR="$YELLOW"
-else BAR_COLOR="$GREEN"; fi
+else
+  BAR_COLOR="$GREEN"
+fi
 
 BAR_WIDTH=10
 FILLED=$((PCT * BAR_WIDTH / 100))
