@@ -44,7 +44,7 @@ export LESS_TERMCAP_ue=$'\e[0m'       # end underline
 export LESS_TERMCAP_se=$'\e[0m'       # end standout-mode
 
 # Configure GPG.
-#export GNUPGHOME="${XDG_CONFIG_HOME}/gnupg"
+export GNUPGHOME="${XDG_CONFIG_HOME}/gnupg"
 
 # Configure pass, Docker Desktop on Linux uses this tool and while I have used
 # it for years in the past, I've moved to using KeePassXC.

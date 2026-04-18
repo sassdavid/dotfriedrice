@@ -62,7 +62,7 @@ I tried Hyprland too).
 
 ### Packages, scripts and more
 
-There's docs with a list of [packages](./docs/packages.md) along with what they're being used for and why.
+There's docs with a list of [packages](./_docs/packages.md) along with what they're being used for and why.
 
 The source of truth can always be found within the files at
 [_install/default/](./_install/default/). You'll find files related to
@@ -492,7 +492,7 @@ Before hitting enter to continue, you can use page up / down to see what's
 going to happen. Triple check your drive being formatted is the correct one
 and everything else looks good!
 
-- Sit back and relax while everything gets installed for ~5-10 minutes
+- Sit back and relax while everything gets installed in ~2 minutes
 - Choose "Exit archinstall" when it prompts you after it has finished
 - Remove the USB drive from your computer
 - Run `reboot`
@@ -507,8 +507,8 @@ screen. You can log in with the user and password you created. If you enabled
 drive encryption you'll get prompted for your decrypt password before logging
 in.
 
-At this point you have Arch installed and you can run the install script
-earlier in this readme to bootstrap your box!
+At this point you have Arch installed and you can run the bootstrap script
+[mentioned earlier in this readme](#%EF%B8%8F-install) to install these dotfiles!
 
 ### How do I get started with the desktop environment?
 
