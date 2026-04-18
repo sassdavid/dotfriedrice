@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Customize these in the config file instead of editing them here.
+
+# shellcheck disable=SC2034
+declare -A DEFAULT_GIT_IDENTITIES
+
+DEFAULT_GIT_IDENTITIES["bitbucket"]="${HOME}/src/bitbucket/"
+DEFAULT_GIT_IDENTITIES["personal"]="${HOME}/src/github/"
+DEFAULT_GIT_IDENTITIES["work"]="${HOME}/src/codecommit/,${HOME}/src/gerrit/"

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Customize these in the config file instead of editing them here.
+
+export DEFAULT_SCRIPTS_INSTALL=()

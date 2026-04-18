@@ -1,7 +1,6 @@
 [core]
   editor = nvim
   pager = delta
-  longpaths = true
 
 [delta]
   navigate = true
