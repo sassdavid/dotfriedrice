@@ -868,6 +868,12 @@ detect_and_prepare_gpu() {
 
   local kernel_package=
   case "${kernel}" in
+  *cachyos-lts*)
+    kernel_package="linux-cachyos-lts-headers"
+    ;;
+  *cachyos*)
+    kernel_package="linux-cachyos-headers"
+    ;;
   *arch*)
     kernel_package="linux-headers"
     ;;
@@ -1135,6 +1141,7 @@ install_packages() {
 
   # We'll only let users know this detail if auto confirm wasn't enabled.
   if [[ "${FIRST_RUN}" == "1" && "${PACKAGES_AUTO_CONFIRM}" != "1" ]]; then
+    PACKAGES_AUTO_CONFIRM="1"
     first_run_msg=$(
       cat <<EOF
 
@@ -1521,13 +1528,17 @@ ${C_MAGENTA}A destructive action is about to happen. Any warnings you see above 
 you have a file not managed by these dotfiles at that path and now these dotfiles
 want to overwrite it.${C_RESET}
 
-It's up to you on what you want to do:
+It's up to you on what you want to do next:
 
 1) Overwrite all files listed (you will lose them unless you back them up!)
-2) Skip all files listed but its associated program might not work as expected
+2) Skip overwriting anything and this script will exit so you can assess the situation
 
-Alternatively you can manually back up these files now while this prompt is
-running and then choose to overwrite them with option 1.
+You can manually back these files up now while this prompt is running and
+then choose to overwrite them with option 1.
+
+If you're on a fresh system with no terminal yet you can press Ctrl+Alt+F2 to
+use tty2 and then jump back to this script by pressing Ctrl+Alt+F1. If you're on
+a laptop you might need to also hold down Fn.
 EOF
 
     while true; do
@@ -1539,7 +1550,7 @@ EOF
         break
         ;;
       2)
-        return
+        exit
         ;;
       *) _error "'${option}' isn't a valid choice, pick 1 or 2" "" ;;
       esac
@@ -1622,8 +1633,22 @@ configure_system_configs() {
 
   if [ "${OS_DISTRO}" = "arch" ]; then
     local etc_pacman_conf_path="/etc/pacman.conf"
-    if ! grep -q "Include = /etc/pacman\.d/\*\.conf" "${etc_pacman_conf_path}" 2>/dev/null; then
-      printf "\nInclude = /etc/pacman.d/*.conf\n" | sudo tee --append "${etc_pacman_conf_path}" 1>/dev/null
+    # Ensure multilib is disabled since we'll enable it with an include file,
+    # on vanilla Arch it's disabled but other variants might have it enabled.
+    if grep -q "^\[multilib\]" "${etc_pacman_conf_path}"; then
+      sudo sed -i "/^\[multilib\]/,+1 s/^/#/" "${etc_pacman_conf_path}"
+    fi
+
+    if compgen -G "/etc/pacman.d/*.conf" 1>/dev/null; then
+      if ! grep -q "Include = /etc/pacman\.d/\*\.conf" "${etc_pacman_conf_path}"; then
+        printf "\nInclude = /etc/pacman.d/*.conf\n" | sudo tee --append "${etc_pacman_conf_path}" 1>/dev/null
+      fi
+    else
+      # Pacman will fail to run if there's no conf files while this line exists
+      # so we can remove the line.
+      if grep -q "Include = /etc/pacman\.d/\*\.conf" "${etc_pacman_conf_path}"; then
+        sudo sed -i "\|Include = /etc/pacman.d/\*\.conf|d" "${etc_pacman_conf_path}"
+      fi
     fi
   fi
 
@@ -2269,7 +2294,7 @@ healthcheck() {
   _info "CHECK INFORMATION AND VERSIONS"
 
   cat <<EOF
-:: Dotfiles path:
+Dotfiles path:
 
 ${DOTFILES_PATH}
 EOF
@@ -2280,7 +2305,7 @@ EOF
   for identity in "${!GIT_IDENTITIES_EXTRAS[@]}"; do _all_identities["${identity}"]=1; done
   for identity in "${!_all_identities[@]}"; do
     local config_file="${DOTFILES_PATH}/.config/git/config.local.${identity}"
-    printf "\n:: Git user (%s):\n\n" "${identity}"
+    printf "\nGit user (%s):\n\n" "${identity}"
 
     if [ -f "${config_file}" ]; then
       local git_output
@@ -2307,15 +2332,15 @@ EOF
 
   cat <<EOF
 
-:: tmux:
+tmux:
 
 $(tmux -V)
 
-:: Neovim:
+Neovim:
 
 $(mise x neovim -- nvim --version)
 
-:: Fastfetch:
+Fastfetch:
 
 EOF
 
@@ -2467,7 +2492,6 @@ parse_args() {
     fi
 
     git remote | grep -q "${target//./}" && git fetch "${target//./}"
-
     gd "${target}" ${side_by_side:+"${side_by_side}"}
 
     _info "CONDENSED GIT DIFF"
