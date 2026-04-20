@@ -863,11 +863,8 @@ detect_and_prepare_gpu() {
     return
   fi
 
-  local kernel=
-  kernel="$(uname -r)"
-
   local kernel_package=
-  case "${kernel}" in
+  case "${OS_KERNEL}" in
   *cachyos-lts*)
     kernel_package="linux-cachyos-lts-headers"
     ;;
@@ -889,13 +886,13 @@ detect_and_prepare_gpu() {
   *)
     cat <<EOF
 
-'${kernel}' Linux kernel was detected but this script doesn't automatically
+'${OS_KERNEL}' Linux kernel was detected but this script doesn't automatically
 support it because it can't determine which linux-*-headers package to install.
 
-If you think it should work, please open an issue with the above output.
+If you feel this is a bug please open an issue at: ${DOTFILES_CLONE_URL}
 
 EOF
-    _error "Unknown Linux Kernel found, aborting!"
+    _error "Unsupported Linux Kernel detected, aborting!"
     ;;
   esac
 
@@ -1528,17 +1525,17 @@ ${C_MAGENTA}A destructive action is about to happen. Any warnings you see above 
 you have a file not managed by these dotfiles at that path and now these dotfiles
 want to overwrite it.${C_RESET}
 
-It's up to you on what you want to do next:
+${C_YELLOW}What would you like to do next?
 
-1) Overwrite all files listed (you will lose them unless you back them up!)
-2) Skip overwriting anything and this script will exit so you can assess the situation
+1) Overwrite all files listed above (you will lose them unless you back them up!)
+2) Skip overwriting anything and this script will exit so you can assess the situation${C_RESET}
 
 You can manually back these files up now while this prompt is running and
 then choose to overwrite them with option 1.
-
+${C_WHITE}
 If you're on a fresh system with no terminal yet you can press Ctrl+Alt+F2 to
 use tty2 and then jump back to this script by pressing Ctrl+Alt+F1. If you're on
-a laptop you might need to also hold down Fn.
+a laptop you might need to also hold down Fn.${C_RESET}
 EOF
 
     while true; do
@@ -2383,35 +2380,6 @@ install_mongodb_tools() {
   "${DOTFILES_PATH}/.local/bin/install_mongodb_tools"
 }
 
-configure_docker_completion() {
-  # Only generate docker completion for WSL2 environments
-  if [ "${OS_IN_WSL}" != "1" ]; then
-    printf "Skipping Docker completion (not in WSL2 environment)\n\n"
-    return
-  fi
-
-  if command -v docker >/dev/null 2>&1; then
-    printf "Docker command found\n"
-
-    local completion_dir="${XDG_DATA_HOME}/zsh/completions"
-    local completion_file="${completion_dir}/_docker"
-
-    if [ -d "${completion_dir}" ]; then
-      printf "%s directory found\n" "${completion_dir}"
-
-      if docker completion zsh >"${completion_file}" 2>/dev/null; then
-        printf "Docker zsh completion script has been generated at %s\n\n" "${completion_file}"
-      else
-        printf "Failed to generate Docker completion script — 'docker completion zsh' command failed\n\n"
-      fi
-    else
-      printf "%s directory not found\n\n" "${completion_dir}"
-    fi
-  else
-    printf "Docker command not found\n\n"
-  fi
-}
-
 configure_tools() {
   _info "CONFIGURE TOOLS COMPLETION"
 
@@ -2422,8 +2390,6 @@ configure_tools() {
   mise x ripgrep -- rg --generate complete-zsh >"${XDG_DATA_HOME}/zsh/completions/_rg"
   mise x 1password-cli -- op completion zsh >"${XDG_DATA_HOME}/zsh/completions/_op"
   mise x kafkactl -- kafkactl completion zsh >"${XDG_DATA_HOME}/zsh/completions/_kafkactl"
-
-  configure_docker_completion
 
   printf "Completion has been configured for tools\n"
 }
@@ -2459,8 +2425,9 @@ EOF
 P.S.,
 
 Since you've set GUI_LINUX=1 and this is the first time you've run everything,
-you'll want to reboot. After logging in with your user and password then niri
-will start by default due to the .zprofile.local file in your dotfiles path.
+you'll want to reboot by running \`systemctl reboot\`. After logging in with your
+user and password then niri will start by default due to the .zprofile.local
+file in your dotfiles path.
 EOF
   fi
 }
@@ -2626,7 +2593,7 @@ EOF
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   parse_args "${@}"
 
-  detect_env
+  detect_env_results
   verify_dotfiles_path
 
   if [ "${PULL}" != "1" ]; then

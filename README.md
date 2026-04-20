@@ -28,24 +28,27 @@ Everyone is welcome here and you have full control.
 
 ### Command line
 
-*Supports Arch Linux, Debian, Ubuntu and macOS. It also supports WSL 2 for any
-supported Linux distro.*
+*Supports Arch Linux, both vanilla and Arch-like distros such as CachyOS, etc..
+It also supports Debian, Ubuntu (vanilla and all flavors), macOS and there's
+WSL 2 support for any supported Linux distro.*
 
-- Highlights:
-  - Tweak out your shell (zsh)
-  - Set up tmux
-  - Fully configure Neovim
-  - Install modern CLI tools and programming languages
+#### Highlights
+
+- Tweak out your shell (zsh)
+- Set up tmux
+- Fully configure Neovim
+- Install modern CLI tools and programming languages
 
 ### (Optional) Scrolling / tiling desktop environment
 
-*Supports Arch Linux.*
+*Supports Arch Linux, both vanilla and Arch-like distros such as CachyOS, etc.*
 
-- Highlights:
-  - [niri](https://github.com/YaLTeR/niri) *(Wayland compositor)*, Waybar *(status bar)*, Walker *(app launcher)* and friends
-  - Hotkey focused but tons of mouse / trackpad support
-  - Prefer TUI (Terminal User Interface) apps over GUI apps when possible
-  - Development / media creation focused apps are ready to go
+#### Highlights
+
+- [niri](https://github.com/YaLTeR/niri) *(Wayland compositor)*, Waybar *(status bar)*, Walker *(app launcher)* and friends
+- Hotkey focused but tons of mouse / trackpad support
+- Prefer TUI (Terminal User Interface) apps over GUI apps when possible
+- Development / media creation focused apps are ready to go
 
 #### Why niri and not XYZ?
 
@@ -88,11 +91,11 @@ include screenshots in 1 spot.
 
 ### Tokyonight Moon
 
-![Tokyonight Moon](_themes/tokyonight-moon/_preview.jpg)
+![Tokyonight Moon](./_themes/tokyonight-moon/_preview.jpg)
 
 ### Gruvbox Dark (Medium)
 
-![Gruvbox Dark Medium](_themes/gruvbox-dark-medium/_preview.jpg)
+![Gruvbox Dark Medium](./_themes/gruvbox-dark-medium/_preview.jpg)
 
 I prefer using themes that have good contrast ratios and are clear to see in
 video recordings. These dotfiles currently support easily switching between
@@ -189,7 +192,7 @@ it does. The bottom of the file is a good place to start. Alternatively you can
 look around this repo and reference the config files directly without using any
 script.*
 
-🐳 **Try it in Docker without modifying your system:**
+🐳 **Try the command line version in Docker without modifying your system:**
 
 ```sh
 # Start a Debian container, we're passing OS_IN_CONTAINER to be explicit we're in a container.
@@ -200,7 +203,7 @@ docker container run --rm -it -e "OS_IN_CONTAINER=1" -v "${PWD}:/app" -w /app de
 # Since we can't open a new terminal in a container we'll need to manually
 # launch zsh and source a few files. That's what the last line is doing.
 apt-get update && apt-get install --yes --no-install-recommends curl \
-  && bash <(curl -fsSL https://raw.githubusercontent.com/sassdavid/dotfiles/main/install) \
+  && bash <(curl -fsSL https://raw.githubusercontent.com/sassdavid/dotfiles/main/bootstrap) \
   && zsh -c ". ~/.config/zsh/.zprofile && . ~/.config/zsh/.zshrc; zsh -i"
 ```
 
