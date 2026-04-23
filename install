@@ -2062,7 +2062,7 @@ configure_git() {
       continue
     fi
 
-    unset YOUR_NAME YOUR_EMAIL
+    YOUR_NAME="" YOUR_EMAIL=""
     printf "\nCONFIGURING '%s'\n" "${identity^^}"
 
     ask_for_name "${path}"
