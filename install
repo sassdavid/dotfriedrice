@@ -367,7 +367,11 @@ _curl() {
 
 _find_pwsh() {
   local p=
-  for p in pwsh.exe '/mnt/c/Program Files/PowerShell/7/pwsh.exe' '/c/Program Files/PowerShell/7/pwsh.exe'; do
+  for p in \
+    pwsh.exe \
+    '/mnt/c/Program Files/PowerShell/7/pwsh.exe' \
+    powershell.exe \
+    '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe'; do
     if command -v "$p" >/dev/null 2>&1 || [ -x "$p" ]; then
       printf '%s' "$p"
       return 0
@@ -439,6 +443,21 @@ _windows_openssh_dir() {
   return 1
 }
 
+_windows_find_op_ssh_sign() {
+  # Expects the default WSL 2 /mnt/c/ mount.
+  # New path: MSIX installer (8.11.18+). Old path: EXE installer (8.11.16 and earlier),
+  # no .exe extension. Both variants are checked.
+  local windows_user="${1}"
+  local c
+  for c in \
+    "/mnt/c/Users/${windows_user}/AppData/Local/Microsoft/WindowsApps/op-ssh-sign-wsl.exe" \
+    "/mnt/c/Users/${windows_user}/AppData/Local/1Password/app/8/op-ssh-sign-wsl" \
+    "/mnt/c/Users/${windows_user}/AppData/Local/1Password/app/8/op-ssh-sign-wsl.exe"; do
+    [ -x "${c}" ] && printf '%s' "${c}" && return 0
+  done
+  return 1
+}
+
 _escape_path_spaces() {
   # /mnt/c/Program Files/OpenSSH -> /mnt/c/Program\ Files/OpenSSH
   printf '%s' "${1// /\\ }"
@@ -460,7 +479,9 @@ _package_install() {
   )
 
   local -a confirm_flag=()
-  [ "${PACKAGES_AUTO_CONFIRM}" == "1" ] && confirm_flag+=("${confirm_map[${manager}]}")
+  if [[ "${PACKAGES_AUTO_CONFIRM}" == "1" && -v confirm_map["${manager}"] ]]; then
+    confirm_flag+=("${confirm_map["${manager}"]}")
+  fi
 
   case "${manager}" in
   pacman)
@@ -575,8 +596,11 @@ _install_packages_macos() {
   local prefix="/opt/homebrew"
   [[ "${CPU_ARCH}" == "x86_64" ]] && prefix="/usr/local"
 
-  # Ensure brew's paths are available for this script
+  # Ensure brew's paths are available for this script.
   eval "$(${prefix}/bin/brew shellenv)"
+
+  # This gets written to your zprofile later but let's set it here for this shell.
+  export HOMEBREW_NO_ANALYTICS="1"
 
   # Install Brew packages.
   _package_install brew "${PACKAGES_BREW[@]}" "${PACKAGES_BREW_EXTRAS[@]}"
@@ -746,8 +770,8 @@ _config_install_display() {
         target_path="${destination%/}/${source##*/}"
       fi
 
-      # If target is a real file it will be empty. We're avoiding readlink
-      # since using it with -m doesn't work on macOS.
+      # If target is a real file it will be empty. We're avoiding realpath -m
+      # since -m doesn't work on macOS.
       local target
       target="$(readlink "${target_path}" 2>/dev/null || true)"
 
@@ -1197,7 +1221,7 @@ check_install_config() {
   real_file="install-config"
 
   if [ "${example_file}" -nt "${real_file}" ]; then
-    delta --paging=never install-config install-config.example || true
+    DELTA_PAGER="cat" git diff --no-index install-config install-config.example
 
     cat <<EOF
 
@@ -1581,9 +1605,8 @@ configure_sudoers_entries() {
   done
 
   sudo chmod -R 440 /etc/sudoers.d
-  echo
 
-  echo "They have been configured in '/etc/sudoers.d/'"
+  printf "\nThey have been configured in '/etc/sudoers.d/'\n"
 }
 
 configure_systemd_services() {
@@ -1621,8 +1644,7 @@ configure_systemd_services() {
     fi
   done
 
-  echo
-  echo "They have been configured to start on boot"
+  printf "\nThey have been configured to start on boot\n"
 }
 
 configure_system_configs() {
@@ -1780,7 +1802,7 @@ configure_shell() {
 
   if [ "${OS_TYPE}" == "darwin" ]; then
     if ! grep -q "HOMEBREW_NO_ANALYTICS" "${zprofile_path}" 2>/dev/null; then
-      printf '\nexport HOMEBREW_NO_ANALYTICS=1\n' >>"${zprofile_path}"
+      printf '\nexport HOMEBREW_NO_ANALYTICS="1"\n' >>"${zprofile_path}"
     fi
 
     if ! grep -q "eval.*homebrew.*shellenv" "${zprofile_path}" 2>/dev/null; then
@@ -2007,8 +2029,29 @@ configure_git() {
   windows_user="$(_windows_username 2>/dev/null || true)"
 
   local ssh_sign_program=""
-  [[ "${OS_TYPE}" == "darwin" ]] && ssh_sign_program="/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
-  [[ -n "${windows_user}" ]] && ssh_sign_program="/mnt/c/Users/${windows_user}/AppData/Local/Microsoft/WindowsApps/op-ssh-sign-wsl.exe"
+  if [[ "${OS_TYPE}" == "darwin" ]] && [[ -x "/Applications/1Password.app/Contents/MacOS/op-ssh-sign" ]]; then
+    ssh_sign_program="/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
+  fi
+  if [[ -n "${windows_user}" ]]; then
+    local op_sign=
+    op_sign="$(_windows_find_op_ssh_sign "${windows_user}" 2>/dev/null || true)"
+    [[ -n "${op_sign}" ]] && ssh_sign_program="$(_escape_path_spaces "${op_sign}")"
+  fi
+  if [[ "${OS_TYPE}" == "linux" ]] && [[ "${OS_IN_WSL}" != "1" ]]; then
+    # Check PATH first (covers DEB/RPM/AUR/tar.gz that add a symlink), then known
+    # install-specific paths for /opt (DEB/RPM/tar.gz/AUR) and Snap.
+    # Flatpak excluded: 1Password SSH agent doesn't work in the Flatpak sandbox.
+    local linux_candidate=
+    for linux_candidate in \
+      "$(command -v op-ssh-sign 2>/dev/null || true)" \
+      "/opt/1Password/op-ssh-sign" \
+      "/snap/1password/current/opt/1Password/op-ssh-sign"; do
+      [[ -n "${linux_candidate}" && -x "${linux_candidate}" ]] && {
+        ssh_sign_program="${linux_candidate}"
+        break
+      }
+    done
+  fi
 
   local identity path
   for identity in "${identities[@]}"; do
@@ -2053,6 +2096,19 @@ EOF
 
     printf "Created %s\n" "${path}"
   done
+
+  # If a signing program is now known, patch the empty placeholder in all identity
+  # files (including pre-existing ones). This handles 1Password being installed
+  # after the initial dotfiles setup — re-running ./install picks it up.
+  # Only touches the line when it is still the commented-out empty placeholder;
+  # manually configured or already-set lines are left untouched.
+  if [[ -n "${ssh_sign_program}" ]]; then
+    for identity in "${identities[@]}"; do
+      path="${config_dir}/config.local.${identity}"
+      [[ -f "${path}" ]] || continue
+      sed -i.bak 's|^#  program = ""$|#  program = "'"${ssh_sign_program}"'"|' "${path}" && rm -f "${path}.bak"
+    done
+  fi
 
   # Generate includeIf directives
   local includes_path="${config_dir}/config.local.includes"
@@ -2291,18 +2347,16 @@ healthcheck() {
   _info "CHECK INFORMATION AND VERSIONS"
 
   cat <<EOF
-Dotfiles path:
-
+${C_BLUE}DOTFILES_PATH:${C_RESET}
 ${DOTFILES_PATH}
 EOF
-
   # Display all configured git identities (base + extras)
   local -A _all_identities=()
   for identity in "${!GIT_IDENTITIES[@]}"; do _all_identities["${identity}"]=1; done
   for identity in "${!GIT_IDENTITIES_EXTRAS[@]}"; do _all_identities["${identity}"]=1; done
   for identity in "${!_all_identities[@]}"; do
     local config_file="${DOTFILES_PATH}/.config/git/config.local.${identity}"
-    printf "\nGit user (%s):\n\n" "${identity}"
+    printf "\n%bGit user (%s):%b\n" "${C_BLUE}" "${identity}" "${C_RESET}"
 
     if [ -f "${config_file}" ]; then
       local git_output
@@ -2328,17 +2382,13 @@ EOF
   done
 
   cat <<EOF
-
-tmux:
-
+${C_BLUE}tmux:${C_RESET}
 $(tmux -V)
 
-Neovim:
-
+${C_BLUE}Neovim:${C_RESET}
 $(mise x neovim -- nvim --version)
 
-Fastfetch:
-
+${C_BLUE}Fastfetch:${C_RESET}
 EOF
 
   mise x fastfetch -- fastfetch
@@ -2519,64 +2569,129 @@ parse_args() {
   --skip-system-packages | -S)
     SKIP_SYSTEM_PACKAGES=1
     ;;
+  --debug | -b)
+    detect_env
+
+    _info "DEBUG INFORMATION" ""
+
+    cat <<EOF
+${C_BLUE}#### Dotfiles Environment${C_RESET}
+
+${C_WHITE}\`\`\`sh${C_RESET}
+CPU_ARCH="${CPU_ARCH}"
+
+OS_KERNEL="${OS_KERNEL}"
+OS_DISTRO="${OS_DISTRO}"
+OS_DISTRO_LIKE=${OS_DISTRO_LIKE}"
+
+OS_IN_WSL="${OS_IN_WSL}"
+OS_IN_CONTAINER="${OS_IN_CONTAINER}"
+
+GUI_ELIGIBLE="${GUI_ELIGIBLE}"
+GUI_ENABLED="${GUI_ENABLED}"
+
+DOTFILES_BRANCH="${DOTFILES_BRANCH}"
+DOTFILES_REF="$(git log -1 --format="%as :: %h :: %s")"
+${C_WHITE}\`\`\`${C_RESET}
+EOF
+
+    local system_info=
+    if system_info="$(fastfetch --logo none --structure-disabled "Title:Separator:Colors:Break" 2>/dev/null)"; then
+      cat <<EOF
+
+${C_BLUE}#### System Information${C_RESET}
+
+${C_WHITE}\`\`\`yaml${C_RESET}
+${system_info}
+${C_WHITE}\`\`\`${C_RESET}
+EOF
+    fi
+
+    cat <<EOF
+${C_WHITE}
+If something isn't working as expected, if it makes sense please include the
+the above when creating an issue at: ${DOTFILES_CLONE_URL}${C_RESET}
+EOF
+
+    exit
+    ;;
   --help | -h)
     cat <<EOF
-  Usage examples:
+${C_BLUE}-------------------------------------------------------------------------------
+KEEPING UP TO DATE
+-------------------------------------------------------------------------------${C_RESET}
 
-  # Run the install script based on the local copy of your dotfiles
-  ${C_GREEN}./install${C_RESET}
+${C_WHITE}# Run the install script based on the local copy of your dotfiles.
+${C_GREEN}./install
 
-  # The same as above but skip installing packages (useful for updating symlinks)
-  ${C_GREEN}./install --skip-system-packages${C_RESET}
+${C_WHITE}# The same as above but skip installing packages (useful for updating symlinks).
+${C_GREEN}./install --skip-system-packages | -S
 
-  # Pulls in the latest remote commits and merges them into your local branch,
-  # if a BRANCH is supplied a new local branch will be created to be merged into
-  # which is helpful for testing PRs without affecting your main branch.
-  ${C_GREEN}./install --pull [BRANCH] (it defaults to the currently checked out branch if not supplied)${C_RESET}
+${C_WHITE}# Pulls in the latest remote commits and merges them into your local branch,
+# if a BRANCH is supplied a new local branch will be created to be merged into
+# which is helpful for testing PRs without affecting your main branch.
+#
+# It defaults to the currently checked out branch if not supplied.
+${C_GREEN}./install --pull ${C_CYAN}[BRANCH]
 
-  # The same as --pull but also runs the install script afterwards.
-  ${C_GREEN}./install --update [BRANCH]${C_RESET}
+${C_WHITE}# The same as --pull but also runs the install script afterwards.
+${C_GREEN}./install --update ${C_CYAN}[BRANCH]
 
-  # Show a diff of your install-config vs the local install-config.example.
-  ${C_GREEN}./install --diff-config${C_RESET}
+${C_BLUE}-------------------------------------------------------------------------------
+WHAT'S DIFFERENT
+-------------------------------------------------------------------------------${C_RESET}
 
-  # The same as above but show the diff in side-by-side (split) mode.
-  ${C_GREEN}./install --diff-config --side${C_RESET}
+${C_WHITE}# Diff your install-config vs the local install-config.example.
+${C_GREEN}./install --diff-config
 
-  # Show a diff of any local uncommited or committed changes vs the remote.
-  ${C_GREEN}./install --diff [TARGET]${C_RESET} (it defaults to "origin" if not supplied)
+${C_WHITE}# The same as above but show the diff in side-by-side (split) mode.
+${C_GREEN}./install --diff-config --side
 
-  # The same as above but show the diff in side-by-side (split) mode.
-  ${C_GREEN}./install --diff --side${C_RESET}
+${C_WHITE}# Diff any local uncommited or committed changes vs the remote, defaults to "origin".
+${C_GREEN}./install --diff ${C_CYAN}[TARGET]${C_RESET}
 
-  # Compare your currently checked out branch to your local ${DOTFILES_BRANCH} branch, this
-  # could be helpful if you have a personalized branch and you pull updates into
-  # ${DOTFILES_BRANCH} and now you want to compare them locally.
-  ${C_GREEN}./install --diff ${DOTFILES_BRANCH}${C_RESET}
+${C_WHITE}# The same as above but show the diff in side-by-side (split) mode.
+${C_GREEN}./install --diff --side
 
-  # Show new remote commits that do not exist locally.
-  ${C_GREEN}./install --new-commits [TARGET]${C_RESET} (it defaults to "..origin" if not supplied)
+${C_WHITE}# Compare your currently checked out branch to your local ${DOTFILES_BRANCH} branch, this
+# could be helpful if you have a personalized branch and you pull updates into
+# ${DOTFILES_BRANCH} and now you want to compare them locally.
+${C_GREEN}./install --diff ${C_CYAN}${DOTFILES_BRANCH}
 
-  # Show your local commits that don't exist in the remote.
-  ${C_GREEN}./install --new-commits origin..${C_RESET}
+${C_WHITE}# Show all of your local files that are git ignored such as configs, history and scripts.
+${C_GREEN}./install --local-files
 
-  # The same as above except compare it to your local ${DOTFILES_BRANCH} branch not remote.
-  ${C_GREEN}./install --new-commits ..${DOTFILES_BRANCH}${C_RESET}
+${C_BLUE}-------------------------------------------------------------------------------
+WHAT'S NEW
+-------------------------------------------------------------------------------${C_RESET}
 
-  # Show your local commits that don't exist in the remote and new remote commits.
-  ${C_GREEN}./install --new-commits origin...${C_RESET}
+${C_WHITE}# Show new remote commits that do not exist locally, defaults to "..origin".
+${C_GREEN}./install --new-commits ${C_CYAN}[TARGET]
 
-  # The same as above except compare it to your local ${DOTFILES_BRANCH} branch not remote.
-  ${C_GREEN}./install --new-commits ...${DOTFILES_BRANCH}${C_RESET}
+${C_WHITE}# Show your local commits that don't exist in the remote.
+${C_GREEN}./install --new-commits ${C_CYAN}origin..
 
-  # Show a list of commits on a remote.
-  ${C_GREEN}./install --changelog [TARGET] (it defaults to "origin" if not supplied)${C_RESET}
+${C_WHITE}# The same as above except compare it to your local ${DOTFILES_BRANCH} branch not remote.
+${C_GREEN}./install --new-commits ${C_CYAN}..${DOTFILES_BRANCH}
 
-  # Show all of your local files that are git ignored such as configs, history and scripts.
-  ${C_GREEN}./install --local-files${C_RESET}
+${C_WHITE}# Show your local commits that don't exist in the remote and new remote commits.
+${C_GREEN}./install --new-commits ${C_CYAN}origin...
 
-  # Show this help menu.
-  ${C_GREEN}./install --help${C_RESET}
+${C_WHITE}# The same as above except compare it to your local ${DOTFILES_BRANCH} branch not remote.
+${C_GREEN}./install --new-commits ${C_CYAN}...${DOTFILES_BRANCH}
+
+${C_WHITE}# Show a list of commits on a remote, defaults to "origin".
+${C_GREEN}./install --changelog ${C_CYAN}[TARGET]${C_RESET}
+
+${C_BLUE}-------------------------------------------------------------------------------
+HELP
+-------------------------------------------------------------------------------${C_RESET}
+
+${C_WHITE}# Show debug information that you can paste into an issue.
+${C_GREEN}./install --debug
+
+${C_WHITE}# Show this help menu.
+${C_GREEN}./install --help
 EOF
     exit
     ;;

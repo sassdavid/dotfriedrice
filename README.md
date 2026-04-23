@@ -28,9 +28,10 @@ Everyone is welcome here and you have full control.
 
 ### Command line
 
-*Supports Arch Linux, both vanilla and Arch-like distros such as CachyOS, etc..
-It also supports Debian, Ubuntu (vanilla and all flavors), macOS and there's
-WSL 2 support for any supported Linux distro.*
+🛟 *Supports **Arch Linux**, both vanilla and Arch-like distros such as
+**CachyOS**, etc.. It also supports **Debian**, **Ubuntu** (vanilla and all
+flavors), **macOS** and there's **WSL 2** support for any supported Linux
+distro.*
 
 #### Highlights
 
@@ -41,7 +42,7 @@ WSL 2 support for any supported Linux distro.*
 
 ### (Optional) Scrolling / tiling desktop environment
 
-*Supports Arch Linux, both vanilla and Arch-like distros such as CachyOS, etc.*
+🛟 *Supports **Arch Linux**, both vanilla and Arch-like distros such as **CachyOS**, etc.*
 
 #### Highlights
 
@@ -75,6 +76,10 @@ packages, standalone scripts, programming languages and more.
 
 - [Themes](#-themes)
 - [Quickly Get Set Up](#-quickly-get-set-up)
+  - [Make it your own](#-make-it-your-own)
+    - [Git identities](#git-identities)
+  - [Extra WSL 2 steps](#-extra-wsl-2-steps)
+    - [1Password SSH Agent Integration](#1password-ssh-agent-integration)
 - [FAQ](#-faq)
   - [How to personalize these dotfiles?](#how-to-personalize-these-dotfiles)
   - [How to theme custom apps?](#how-to-theme-custom-apps)
@@ -153,16 +158,16 @@ You'll be able to choose where you want to clone these dotfiles to and also
 have an opportunity to review and edit what gets installed if you want to
 customize the defaults.
 
-If you're setting up a brand new system and plan to use the desktop environment
-you'll want to set up a bootable USB stick with the official [Arch Linux
+### 🌱 On a fresh system?
+
+If you plan to use the desktop environment you'll want to set up a bootable USB
+stick with the official [Arch Linux
 ISO](https://fastly.mirror.pkgbuild.com/iso/latest/) and then run the official
 [archinstall](https://wiki.archlinux.org/title/Archinstall) script. There is a
 FAQ item [covering all of that](#how-to-install-arch-linux).
 
-### 🌱 On a fresh system?
-
-We're in a catch-22 where this project will set everything up for you
-but to start using it you need `curl` to download its related install script.
+Also, we're in a catch-22 where this project will set everything up for you but
+to start using it you need `curl` to download its related install script.
 
 #### Arch Linux and macOS
 
@@ -175,6 +180,20 @@ default.
 # You can run this as root.
 apt-get update && apt-get install --yes --no-install-recommends curl
 ```
+
+### 🔌 On an existing system?
+
+For the command line version, it's unlikely you'll run into any conflicts when
+installing these dotfiles.
+
+For the desktop environment, these dotfiles won't modify other environments you
+have. It will install everything and configure your user's shell to launch niri
+after logging in. It won't interfere with a login manager if you have one.
+
+With that said, if you plan to go all-in with the desktop environment it's
+worth considering backing up your files and
+creating a fresh install but it's not technically required if you do manual
+cleanup. It's up to you!
 
 ### ⚡️ Install
 
@@ -246,6 +265,9 @@ Here's a few handy commands, you can run `./install --help` to see all of them:
   - Show all local git ignored files such as configs, history and scripts
   - Useful to see everything not committed and for optionally backing up those files
     - Example: `./install --local-files | xargs zip dotfiles-personal.zip`
+- `./install --debug`
+  - Show dotfiles environment and system information
+  - Can be used to help report issues and check your system stats
 
 ### 🔧 Make it your own
 
@@ -261,6 +283,55 @@ project.
 
 Before you start customizing other files, please take a look at the
 [personalization question in the FAQ](#how-to-personalize-these-dotfiles).
+
+#### Git identities
+
+If you work across multiple contexts (personal, work, clients) these dotfiles
+have a multi-identity git system that automatically switches your `user.name`
+and `user.email` based on which directory you're working in.
+
+During the install the script will prompt you for a name and email per
+identity. These get saved to `~/.config/git/config.local.{name}` and a
+`~/.config/git/config.local.includes` file is auto-generated with
+[`includeIf "gitdir:..."`](https://git-scm.com/docs/git-config#_conditional_includes)
+directives so git picks the right one automatically.
+
+The default identities and their source paths are:
+
+| Identity    | Directories                           |
+|-------------|---------------------------------------|
+| `personal`  | `~/src/github/`                       |
+| `work`      | `~/src/codecommit/`, `~/src/gerrit/`  |
+| `bitbucket` | `~/src/bitbucket/`                    |
+
+You can replace the defaults or add your own identities in `install-config`:
+
+```sh
+# Replace all defaults with your own:
+declare -A GIT_IDENTITIES=(
+  ["personal"]="${HOME}/src/github/"
+  ["work"]="${HOME}/src/work/"
+)
+
+# Or just add on top of the defaults:
+GIT_IDENTITIES_EXTRAS["client"]="${HOME}/src/client/"
+```
+
+Each identity config also includes commented-out lines for SSH commit signing
+via 1Password. The install script auto-detects the signing binary on all
+supported platforms:
+
+- **macOS** — `/Applications/1Password.app/Contents/MacOS/op-ssh-sign`
+- **Linux** — `/opt/1Password/op-ssh-sign` (DEB, RPM, tar.gz, AUR) or the
+  Snap path, whichever is present
+- **WSL 2** — `op-ssh-sign-wsl.exe` for the MSIX installer (8.11.18+) or
+  the legacy path for the older EXE installer (8.11.16 and earlier)
+
+If you install 1Password after the initial dotfiles setup, re-run `./install`
+and it will patch the signing program path into your existing identity configs.
+The `program =` line is pre-filled but left commented out — to activate signing
+you only need to uncomment the `[gpg "ssh"]` block and add your key fingerprint
+to `signingkey` in `~/.config/git/config.local.{name}`.
 
 ### 🪟 Extra WSL 2 steps
 
@@ -315,29 +386,36 @@ services were delayed from starting by ~2 minutes.
 
 #### 1Password SSH Agent Integration
 
-To use the 1Password SSH agent with WSL 2, you need to configure your shell to use the Windows OpenSSH client. This setup allows Git and SSH commands
-in WSL to work with 1Password.
+If 1Password is installed on Windows the install script automatically detects
+it and configures `GIT_SSH`, `GIT_SSH_COMMAND` and the `ssh` / `ssh-add` /
+`scp` aliases to point to the Windows OpenSSH client. This is required for
+Git and SSH commands in WSL 2 to talk to the 1Password SSH agent on the
+Windows side.
+
+To finish the setup on the 1Password side:
 
 1. Follow the official setup guides:
     - [Get started with 1Password SSH agent](https://developer.1password.com/docs/ssh/get-started/)
     - [WSL 2 integration details](https://developer.1password.com/docs/ssh/integrations/wsl/)
-2. Shell Configuration:
-    - In your `~/.config/zsh/.zprofile.local`:
-      ```sh
-      export GIT_SSH="/mnt/c/Program\ Files/OpenSSH/ssh.exe"
-      export GIT_SSH_COMMAND="/mnt/c/Program\ Files/OpenSSH/ssh.exe"
-      ```
-    - In your `~/.config/zsh/.aliases.local`:
-      ```sh
-      alias ssh="/mnt/c/Program\ Files/OpenSSH/ssh.exe"
-      alias ssh-add="/mnt/c/Program\ Files/OpenSSH/ssh-add.exe"
-      alias scp="/mnt/c/Program\ Files/OpenSSH/scp.exe"
-      
-      alias ssh2="/usr/bin/ssh"  # fallback to WSL SSH if needed
-      ```
 
-**These settings ensure that SSH and Git commands inside WSL 2 use the Windows-side OpenSSH client, which is required for 1Password's SSH agent to
-function correctly.**
+If auto-detection didn't run (e.g. 1Password was installed after you ran the
+install script), you can add the configuration manually in the `.local` files:
+
+- In your `~/.config/zsh/.zprofile.local`:
+  ```sh
+  export GIT_SSH="/mnt/c/Program\ Files/OpenSSH/ssh.exe"
+  export GIT_SSH_COMMAND="/mnt/c/Program\ Files/OpenSSH/ssh.exe"
+  ```
+- In your `~/.config/zsh/.aliases.local`:
+  ```sh
+  alias ssh="/mnt/c/Program\ Files/OpenSSH/ssh.exe"
+  alias ssh-add="/mnt/c/Program\ Files/OpenSSH/ssh-add.exe"
+  alias scp="/mnt/c/Program\ Files/OpenSSH/scp.exe"
+
+  alias ssh2="/usr/bin/ssh"
+  ```
+
+For SSH commit signing see the [Git identities](#git-identities) section above.
 
 ## 🔍 FAQ
 
