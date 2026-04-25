@@ -4,9 +4,9 @@
 set -o errexit
 
 # Figure out the dotfiles path and the state of the system.
-FIRST_RUN=
+DOTFILES_FIRST_RUN="0"
 DOTFILES_PATH_CONFIGURED="${DOTFILES_PATH:-}"
-[ -z "${DOTFILES_PATH}" ] && FIRST_RUN=1
+[ -z "${DOTFILES_PATH}" ] && DOTFILES_FIRST_RUN="1"
 DOTFILES_PATH="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 
 # shellcheck disable=SC1091
@@ -32,20 +32,19 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   # shellcheck disable=SC1091
   . "${DOTFILES_PATH}/_install/default/sudoers_entries"
   # shellcheck disable=SC1091
+  . "${DOTFILES_PATH}/_install/default/udev_rules"
+  # shellcheck disable=SC1091
   . "${DOTFILES_PATH}/_install/default/systemd_services"
   # shellcheck disable=SC1091
   . "${DOTFILES_PATH}/_install/default/git_identities"
 
-  # This will get optionally populated later, it essentially does a git pull
-  # to pull in the latest changes locally.
-  PULL=
+  # Pull in the latest remote changes.
+  PULL="0"
 
-  # This will get optionally populated later, it combines pulling in the latest
-  # updates and running the install script.
-  PULL_UPDATE=
+  # Combine pulling and running the main install script.
+  PULL_UPDATE="0"
 
-  # This will get optionally populated later.
-  SKIP_SYSTEM_PACKAGES=
+  SKIP_SYSTEM_PACKAGES="0"
 
   DOTFILES_CLONE_URL="${DOTFILES_CLONE_URL:-https://github.com/sassdavid/dotfiles}"
   DOTFILES_UPSTREAM_URL="${DOTFILES_UPSTREAM_URL:-https://github.com/sassdavid/dotfiles}"
@@ -55,10 +54,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   YOUR_EMAIL="${YOUR_EMAIL:-}"
 
   # Do we want to auto confirm installing config files during installation?
-  CONFIG_INSTALL_AUTO_CONFIRM="${CONFIG_INSTALL_AUTO_CONFIRM:-}"
+  CONFIG_INSTALL_AUTO_CONFIRM="${CONFIG_INSTALL_AUTO_CONFIRM:-0}"
 
   # Do we want to auto confirm packages during installation?
-  PACKAGES_AUTO_CONFIRM="${PACKAGES_AUTO_CONFIRM:-}"
+  PACKAGES_AUTO_CONFIRM="${PACKAGES_AUTO_CONFIRM:-0}"
 
   # Is the variable defined as an array or string? -z doesn't reliably work
   # on arrays since it only looks at the first element.
@@ -326,6 +325,15 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
   if [[ ! "${SUDOERS_ENTRIES_EXTRAS+x}" ]]; then
     declare -A SUDOERS_ENTRIES_EXTRAS
+  fi
+
+  if [[ ! "${UDEV_RULES+x}" ]]; then
+    unset UDEV_RULES
+    declare -n UDEV_RULES=DEFAULT_UDEV_RULES
+  fi
+
+  if [[ ! "${UDEV_RULES_EXTRAS+x}" ]]; then
+    declare -A UDEV_RULES_EXTRAS
   fi
 
   if [[ "${SYSTEMD_ENABLED_SERVICES+x}" ]]; then
@@ -827,6 +835,18 @@ _theme_download() {
   fi
 }
 
+_file_changed() {
+  local a="${1}"
+  local b="${2}"
+
+  ! sudo [ -f "${b}" ] && return 0
+
+  # Quickly check a string or file against another file for equality.
+  { [ -f "${a}" ] && cat "${a}" || echo "${a}"; } | sudo cmp -s - "${b}" || return 0
+
+  return 1
+}
+
 # -----------------------------------------------------------------------------
 # Main functions
 # -----------------------------------------------------------------------------
@@ -837,7 +857,7 @@ verify_dotfiles_path() {
   fi
 
   # A user moved their dotfiles, so let's maybe adjust their symlinks.
-  if [[ "${FIRST_RUN}" != "1" && "${DOTFILES_PATH}" != "${DOTFILES_PATH_CONFIGURED}" ]]; then
+  if [[ "${DOTFILES_FIRST_RUN}" != "1" && "${DOTFILES_PATH}" != "${DOTFILES_PATH_CONFIGURED}" ]]; then
     cat <<EOF
 ${C_MAGENTA}It looks like you moved your dotfiles directory:${C_RESET}
 
@@ -1141,7 +1161,7 @@ create_initial_dirs() {
 install_packages() {
   _info "INSTALL PACKAGES"
 
-  if [ -n "${SKIP_SYSTEM_PACKAGES}" ]; then
+  if [ "${SKIP_SYSTEM_PACKAGES}" == "1" ]; then
     echo "Skipping, since you've chosen not to install packages."
     return
   fi
@@ -1161,7 +1181,7 @@ install_packages() {
   local first_run_msg=
 
   # We'll only let users know this detail if auto confirm wasn't enabled.
-  if [[ "${FIRST_RUN}" == "1" && "${PACKAGES_AUTO_CONFIRM}" != "1" ]]; then
+  if [[ "${DOTFILES_FIRST_RUN}" == "1" && "${PACKAGES_AUTO_CONFIRM}" != "1" ]]; then
     PACKAGES_AUTO_CONFIRM="1"
     first_run_msg=$(
       cat <<EOF
@@ -1180,7 +1200,7 @@ $(_display_packages)
 ---
 
 ${C_YELLOW}If you choose yes${C_RESET}, the above packages will be installed with or without
-confirmation by you based on if PACKAGES_AUTO_CONFIRM=${PACKAGES_AUTO_CONFIRM:-0} is set to 1.
+confirmation by you based on if PACKAGES_AUTO_CONFIRM=${PACKAGES_AUTO_CONFIRM} is set to 1.
 ${first_run_msg}
 ${C_YELLOW}If you choose no${C_RESET}, the above packages will not be installed and this script
 will exit here. This gives you a chance to edit the list of packages.
@@ -1469,7 +1489,7 @@ install_external_scripts() {
 }
 
 install_configs() {
-  local auto_confirm="${1:-"${CONFIG_INSTALL_AUTO_CONFIRM:-}"}"
+  local auto_confirm="${1:-"${CONFIG_INSTALL_AUTO_CONFIRM}"}"
 
   _info "INSTALL CONFIGS"
 
@@ -1595,18 +1615,66 @@ configure_sudoers_entries() {
   done
 
   if ((${#sudoers_entries[@]} == 0)); then
-    echo "Skipping, since there's no entries set"
+    echo "Skipping, since there's no entries defined"
     return
   fi
 
   for key in "${!sudoers_entries[@]}"; do
+
     [[ "${key}" = "0" || -z "${sudoers_entries[${key}]}" ]] && continue
-    echo "${sudoers_entries[${key}]}" | sudo tee "/etc/sudoers.d/${key}"
+
+    local entry="/etc/sudoers.d/${key}"
+
+    if _file_changed "${sudoers_entries[${key}]}" "${entry}"; then
+      echo "${sudoers_entries[${key}]}" | sudo tee "${entry}"
+      sudo chmod 440 "${entry}"
+    else
+      echo "Skipping, since '${key}' didn't change"
+    fi
   done
 
-  sudo chmod -R 440 /etc/sudoers.d
-
   printf "\nThey have been configured in '/etc/sudoers.d/'\n"
+}
+
+configure_udev_rules() {
+  _info "CONFIGURE UDEV RULES"
+
+  local rules_dir="/etc/udev/rules.d"
+
+  if [ ! -d "${rules_dir}" ]; then
+    echo "Skipping, since this only runs when '${rules_dir}/' exists"
+    return
+  fi
+
+  declare -A udev_rules
+
+  # Merge both arrays.
+  for key in "${!UDEV_RULES[@]}"; do
+    udev_rules["${key}"]="${UDEV_RULES[${key}]}"
+  done
+  for key in "${!UDEV_RULES_EXTRAS[@]}"; do
+    udev_rules["${key}"]="${UDEV_RULES_EXTRAS[${key}]}"
+  done
+
+  if ((${#udev_rules[@]} == 0)); then
+    echo "Skipping, since there's no rules defined"
+    return
+  fi
+
+  for key in "${!udev_rules[@]}"; do
+    [[ "${key}" = "0" || -z "${udev_rules[${key}]}" ]] && continue
+
+    if _file_changed "${udev_rules[${key}]}" "${rules_dir}/${key}.rules"; then
+      echo "${udev_rules[${key}]}" | sudo tee "${rules_dir}/${key}.rules"
+
+      # Apply the changes right now without needing to reboot.
+      sudo udevadm control --reload-rules && sudo udevadm trigger
+    else
+      echo "Skipping, since '${key}.rules' didn't change"
+    fi
+  done
+
+  printf "\nThey have been configured in '%s/'\n" "${rules_dir}"
 }
 
 configure_systemd_services() {
@@ -2467,8 +2535,8 @@ follow the few steps there to complete the installation. You only need to do
 this once to install a few system fonts.
 EOF
   # If there's no Wayland display then it's very likely the first time a user
-  # enabled GUI mode. This is more dependable than checking FIRST_RUN=1 in
-  # case someone installs the command line tools and adds GUI support later.
+  # enabled GUI mode. This is more dependable than checking DOTFILES_FIRST_RUN=1
+  # in case someone installs the command line tools and adds GUI support later.
   elif [[ -z "${WAYLAND_DISPLAY:-}" && "${GUI_ENABLED}" == "1" ]]; then
     cat <<EOF
 
@@ -2561,13 +2629,13 @@ parse_args() {
     exit
     ;;
   --pull | -p)
-    PULL=1
+    PULL="1"
     ;;
   --update | -u)
-    PULL_UPDATE=1
+    PULL_UPDATE="1"
     ;;
   --skip-system-packages | -S)
-    SKIP_SYSTEM_PACKAGES=1
+    SKIP_SYSTEM_PACKAGES="1"
     ;;
   --debug | -b)
     detect_env
@@ -2590,6 +2658,8 @@ OS_IN_CONTAINER="${OS_IN_CONTAINER}"
 GUI_ELIGIBLE="${GUI_ELIGIBLE}"
 GUI_ENABLED="${GUI_ENABLED}"
 
+DOTFILES_FIRST_RUN="${DOTFILES_FIRST_RUN}"
+DOTFILES_CLONE_URL="${DOTFILES_CLONE_URL}"
 DOTFILES_BRANCH="${DOTFILES_BRANCH}"
 DOTFILES_REF="$(git log -1 --format="%as :: %h :: %s")"
 ${C_WHITE}\`\`\`${C_RESET}
@@ -2734,6 +2804,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   install_external_scripts
   install_configs
   configure_sudoers_entries
+  configure_udev_rules
   configure_systemd_services
   configure_system_configs
   configure_home_configs

@@ -22,7 +22,7 @@ alias SZ='tmux-shell-cmd --kill "sz"'
 alias dt='cd ${DOTFILES_PATH} && nvim .'
 alias lz='cd ${XDG_DATA_HOME}/nvim/lazy/LazyVim && nvim .'
 alias lp='cd ${XDG_DATA_HOME}/nvim/lazy && nvim .'
-alias dtcd='cd ${DOTFILES_PATH}'
+alias cddt='cd ${DOTFILES_PATH}'
 
 alias 755d="find . -type d -exec chmod 755 {} \;"
 alias 644f="find . -type f -exec chmod 644 {} \;"
