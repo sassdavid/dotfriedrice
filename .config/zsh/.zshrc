@@ -162,6 +162,8 @@ complete -C "$(which terragrunt)" -C "$(which terraform)" terragrunt
 # shellcheck disable=SC1090
 . <(argocd completion zsh)
 # shellcheck disable=SC1090
+. <(dua completions zsh)
+# shellcheck disable=SC1090
 . <(fnox completion zsh)
 # shellcheck disable=SC1090
 . <(gh completion -s zsh)

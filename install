@@ -629,7 +629,7 @@ _package_display() {
 
   # Let's show something so it doesn't look like it was blindly skipped.
   if ((${#packages[@]} == 0)); then
-    echo "  - Skipping, since there's no packages defined"
+    _skipping "No packages defined" "  - "
     return
   fi
 
@@ -740,7 +740,7 @@ _config_install_display() {
 
   # Let's show something so it doesn't look like it was blindly skipped.
   if ((${#commands[@]} == 0)); then
-    echo "  - Skipping, since there's no config install commands defined"
+    _skipping "No config install commands defined" "  - "
     return
   fi
 
@@ -823,7 +823,7 @@ _theme_download() {
   local theme_path="${XDG_DATA_HOME}/themes/${theme_name}"
 
   if [ -d "${theme_path}" ]; then
-    echo "Skipping, since '${theme_name}' is already installed, delete it to reinstall or update"
+    _skipping "'${theme_name}' already installed, delete it to reinstall or update"
   else
     rm -rf "${zip_path}" "/tmp/${zip_file_name}"
     _curl "${url}" -o "${zip_path}"
@@ -903,7 +903,7 @@ detect_and_prepare_gpu() {
   _info "DETECT AND PREPARE GPU"
 
   if [[ "${GUI_ENABLED}" != "1" || "${SKIP_SYSTEM_PACKAGES}" == "1" ]]; then
-    echo "Skipping, since this only runs when GUI_LINUX=1 is set with packages"
+    _skipping "Only runs when GUI_LINUX=1 is set with packages"
     return
   fi
 
@@ -1065,7 +1065,7 @@ detect_and_prepare_network() {
   _info "DETECT AND PREPARE NETWORK"
 
   if [[ "${GUI_ENABLED}" != "1" || "${SKIP_SYSTEM_PACKAGES}" == "1" ]]; then
-    echo "Skipping, since this only runs when GUI_LINUX=1 is set with packages"
+    _skipping "Only runs when GUI_LINUX=1 is set with packages"
     return
   fi
 
@@ -1075,7 +1075,7 @@ detect_and_prepare_network() {
 
     echo "Wi-Fi adapter found, iwd + impala packages will be installed"
   else
-    echo "Ethernet adapter found, no preparation is necessary"
+    _skipping "Ethernet adapter found, no preparation is required"
   fi
 }
 
@@ -1083,7 +1083,7 @@ detect_and_prepare_bluetooth() {
   _info "DETECT AND PREPARE BLUETOOTH"
 
   if [[ "${GUI_ENABLED}" != "1" || "${SKIP_SYSTEM_PACKAGES}" == "1" ]]; then
-    echo "Skipping, since this only runs when GUI_LINUX=1 is set with packages"
+    _skipping "Only runs when GUI_LINUX=1 is set with packages"
     return
   fi
 
@@ -1093,7 +1093,7 @@ detect_and_prepare_bluetooth() {
 
     echo "Compatible adapter found, bluez + bluetui packages will be installed"
   else
-    echo "Skipping, since no Bluetooth adapter was found"
+    _skipping "No Bluetooth adapter was found"
   fi
 }
 
@@ -1162,7 +1162,7 @@ install_packages() {
   _info "INSTALL PACKAGES"
 
   if [ "${SKIP_SYSTEM_PACKAGES}" == "1" ]; then
-    echo "Skipping, since you've chosen not to install packages."
+    _skipping "You've chosen not to install packages"
     return
   fi
 
@@ -1234,8 +1234,8 @@ EOF
   done
 }
 
-check_install_config() {
-  _info "CHECK INSTALL CONFIG FOR UPDATES"
+compare_install_config() {
+  _info "COMPARE INSTALL CONFIG"
 
   example_file="install-config.example"
   real_file="install-config"
@@ -1267,20 +1267,20 @@ EOF
     _error "There are potentially new updates to merge into your '${real_file}'"
 
   else
-    echo "Skipping, since '${real_file}' is up to date"
+    _skipping "'${real_file}' is up to date"
   fi
 }
 
 update_dotfiles() {
   _info "UPDATE DOTFILES"
 
-  if [ -z "${DOTFILES_PATH:-}" ]; then
-    echo "Skipping, since this is the first time you've run this script"
+  if [ "${DOTFILES_FIRST_RUN}" == "1" ]; then
+    _skipping "This is the first time you've run this script"
     return
   fi
 
   if [[ "${PULL}" != "1" && "${PULL_UPDATE}" != "1" ]]; then
-    echo "Skipping, rerun with --pull or --update to get the latest changes"
+    _skipping "Rerun with --pull or --update to get the latest changes"
     return
   fi
 
@@ -1323,7 +1323,7 @@ update_dotfiles() {
   new_commit_count="$(git -C "${DOTFILES_PATH}" rev-list "${local_branch}..origin/${DOTFILES_BRANCH}" --count)"
 
   if [ "${new_commit_count}" = "0" ]; then
-    echo "Skipping, since local '${local_branch}' has the latest commits from remote '${DOTFILES_BRANCH}'"
+    _skipping "Local '${local_branch}' has the latest commits from remote '${DOTFILES_BRANCH}'"
   else
     # Let's merge the latest updates into the local branch.
     git -C "${DOTFILES_PATH}" checkout --quiet "${local_branch}"
@@ -1364,7 +1364,7 @@ install_fonts() {
   [ -f "${font_path}/${font_filename}" ] && font_is_installed=1
 
   if [ -n "${font_is_installed}" ]; then
-    echo "Skipping, since fonts are already installed at '${font_path}'"
+    _skipping "'${font_path}' already contains installable fonts"
   else
     rm -rf "${font_zip}" "${font_tmp}"
     _curl "${font_url}" -o "${font_zip}"
@@ -1404,7 +1404,7 @@ install_gui_themes() {
   _info "INSTALL GUI THEMES"
 
   if [ "${GUI_ENABLED}" != "1" ]; then
-    echo "Skipping, since this only runs on Linux when GUI_LINUX=1 is set"
+    _skipping "Only runs on Linux when GUI_LINUX=1 is set"
     return
   fi
 
@@ -1418,7 +1418,7 @@ install_gui_themes() {
     "https://github.com/user-attachments/files/26270135/Gruvbox-BL-LB-dark-Medium.zip" \
     "Gruvbox-BL-LB-Dark-Medium"
 
-  printf "\nThey were installed to '%s'\n" "${XDG_DATA_HOME}/themes/"
+  printf "\nInstalled to '%s'\n" "${XDG_DATA_HOME}/themes/"
 }
 
 install_zsh_plugins() {
@@ -1431,7 +1431,7 @@ install_external_scripts() {
   _info "INSTALL EXTERNAL SCRIPTS"
 
   if [ "${SKIP_SYSTEM_PACKAGES}" == "1" ]; then
-    echo "Skipping, since this only runs when packages get installed"
+    _skipping "Only runs when packages get installed"
     return
   fi
 
@@ -1457,7 +1457,7 @@ install_external_scripts() {
   done
 
   if [ ${#scripts_install_filtered[@]} == 0 ]; then
-    echo "Skipping, since there's no scripts to install"
+    _skipping "No scripts to install"
     return
   fi
 
@@ -1481,11 +1481,11 @@ install_external_scripts() {
         echo "Installed '${script}' version ${tag}"
       fi
     else
-      echo "Skipping '${script}', since version ${tag} already exists"
+      _skipping "'${script}' already has version '${tag}' installed"
     fi
   done
 
-  printf "\nThey were installed to '%s'\n" "${HOME}/.local/bin/"
+  printf "\nInstalled to '%s'\n" "${HOME}/.local/bin/"
 }
 
 install_configs() {
@@ -1615,7 +1615,7 @@ configure_sudoers_entries() {
   done
 
   if ((${#sudoers_entries[@]} == 0)); then
-    echo "Skipping, since there's no entries defined"
+    _skipping "No entries defined"
     return
   fi
 
@@ -1629,11 +1629,11 @@ configure_sudoers_entries() {
       echo "${sudoers_entries[${key}]}" | sudo tee "${entry}"
       sudo chmod 440 "${entry}"
     else
-      echo "Skipping, since '${key}' didn't change"
+      _skipping "'${key}' didn't change"
     fi
   done
 
-  printf "\nThey have been configured in '/etc/sudoers.d/'\n"
+  printf "\nConfigured in '/etc/sudoers.d/'\n"
 }
 
 configure_udev_rules() {
@@ -1642,7 +1642,7 @@ configure_udev_rules() {
   local rules_dir="/etc/udev/rules.d"
 
   if [ ! -d "${rules_dir}" ]; then
-    echo "Skipping, since this only runs when '${rules_dir}/' exists"
+    _skipping "Only runs when '${rules_dir}/' exists"
     return
   fi
 
@@ -1657,7 +1657,7 @@ configure_udev_rules() {
   done
 
   if ((${#udev_rules[@]} == 0)); then
-    echo "Skipping, since there's no rules defined"
+    _skipping "No rules defined"
     return
   fi
 
@@ -1670,18 +1670,18 @@ configure_udev_rules() {
       # Apply the changes right now without needing to reboot.
       sudo udevadm control --reload-rules && sudo udevadm trigger
     else
-      echo "Skipping, since '${key}.rules' didn't change"
+      _skipping "'${key}.rules' didn't change"
     fi
   done
 
-  printf "\nThey have been configured in '%s/'\n" "${rules_dir}"
+  printf "\nConfigured in '%s/'\n" "${rules_dir}"
 }
 
 configure_systemd_services() {
   _info "CONFIGURE SYSTEMD SERVICES"
 
   if [ "${GUI_ENABLED}" != "1" ]; then
-    echo "Skipping, since this only runs on Linux when GUI_LINUX=1 is set"
+    _skipping "Only runs on Linux when GUI_LINUX=1 is set"
     return
   fi
 
@@ -1691,7 +1691,7 @@ configure_systemd_services() {
   )
 
   if ((${#services[@]} == 0)); then
-    echo "Skipping, since there's no services defined"
+    _skipping "No services defined"
     return
   fi
 
@@ -1707,35 +1707,53 @@ configure_systemd_services() {
     [[ " ${flags[*]} " == *" --user"* ]] || prefix=(sudo)
 
     if systemctl cat "${flags[@]}" "${service}" 1>/dev/null; then
-      "${prefix[@]}" systemctl "${flags[@]}" enable "${service}" 1>/dev/null
-      echo "'${service}' has been enabled"
+      if "${prefix[@]}" systemctl "${flags[@]}" --quiet is-enabled "${service}"; then
+        _skipping "'${service}' already enabled"
+      else
+        "${prefix[@]}" systemctl "${flags[@]}" enable "${service}" 1>/dev/null
+        echo "'${service}' has been enabled"
+      fi
     fi
   done
-
-  printf "\nThey have been configured to start on boot\n"
 }
 
 configure_system_configs() {
   _info "CONFIGURE SYSTEM CONFIGS"
 
+  if [[ "${OS_DISTRO}" != "arch" && "${GUI_ENABLED}" != "1" ]]; then
+    _skipping "Only runs on Arch Linux or when GUI_LINUX=1 is set"
+    return
+  fi
+
   if [ "${OS_DISTRO}" = "arch" ]; then
     local etc_pacman_conf_path="/etc/pacman.conf"
+    local changed="0"
+
     # Ensure multilib is disabled since we'll enable it with an include file,
     # on vanilla Arch it's disabled but other variants might have it enabled.
     if grep -q "^\[multilib\]" "${etc_pacman_conf_path}"; then
       sudo sed -i "/^\[multilib\]/,+1 s/^/#/" "${etc_pacman_conf_path}"
+      changed="1"
     fi
 
     if compgen -G "/etc/pacman.d/*.conf" 1>/dev/null; then
       if ! grep -q "Include = /etc/pacman\.d/\*\.conf" "${etc_pacman_conf_path}"; then
         printf "\nInclude = /etc/pacman.d/*.conf\n" | sudo tee --append "${etc_pacman_conf_path}" 1>/dev/null
+        changed="1"
       fi
     else
       # Pacman will fail to run if there's no conf files while this line exists
       # so we can remove the line.
       if grep -q "Include = /etc/pacman\.d/\*\.conf" "${etc_pacman_conf_path}"; then
         sudo sed -i "\|Include = /etc/pacman.d/\*\.conf|d" "${etc_pacman_conf_path}"
+        changed="1"
       fi
+    fi
+
+    if [ "${changed}" == "0" ]; then
+      _skipping "'${etc_pacman_conf_path}' already up to date"
+    else
+      echo "'${etc_pacman_conf_path}' has been updated"
     fi
   fi
 
@@ -1747,8 +1765,6 @@ configure_system_configs() {
       fi
     done
   fi
-
-  echo "Everything that required configuring was updated"
 }
 
 configure_home_configs() {
@@ -1756,18 +1772,26 @@ configure_home_configs() {
 
   local ghostty_config="${XDG_CONFIG_HOME}/ghostty/config.local"
 
-  if [ ! -f "${ghostty_config}" ]; then
+  if [ -f "${ghostty_config}" ]; then
+    _skipping "'${ghostty_config}' already exists"
+  else
     printf "# Add your custom overrides and new additions here.\n" >"${ghostty_config}"
+    echo "'${ghostty_config}' has been created"
   fi
 
   if [ "${GUI_ENABLED}" == "1" ]; then
     local mako_config="${XDG_CONFIG_HOME}/mako/config.local"
-    if [ ! -f "${mako_config}" ]; then
+    if [ -f "${mako_config}" ]; then
+      _skipping "'${mako_config}' already exists"
+    else
       printf "# Add your custom overrides and new additions here.\n" >"${mako_config}"
+      echo "'${mako_config}' has been created"
     fi
 
     local wm_config="${XDG_CONFIG_HOME}/niri/config.kdl.local"
-    if [ ! -f "${wm_config}" ]; then
+    if [ -f "${wm_config}" ]; then
+      _skipping "'${wm_config}' already exists"
+    else
       cat <<EOF >"${wm_config}"
 // Add your custom overrides and new additions here.
 
@@ -1786,10 +1810,9 @@ configure_home_configs() {
 //     position x=2560 y=0
 // }
 EOF
+      echo "'${wm_config}' has been created"
     fi
   fi
-
-  echo "Everything that required configuring was updated"
 }
 
 configure_xdg_directories() {
@@ -1844,7 +1867,7 @@ enabled=False
 EOF
   fi
 
-  echo "They have been configured in '${xdg_local_path}'"
+  echo "Configured in '${xdg_local_path}'"
 }
 
 configure_shell() {
@@ -2004,7 +2027,7 @@ EOF
   # volume mounted and this value will be different in Docker.
   DOTFILES_PATH="${original_dotfiles_path}"
 
-  echo "It has been configured in '${DOTFILES_PATH}/.config/zsh/'"
+  echo "Configured in '${DOTFILES_PATH}/.config/zsh/'"
 }
 
 ask_for_name() {
@@ -2018,10 +2041,10 @@ ask_for_name() {
   set -o errexit
 
   if [ -n "${name}" ]; then
-    echo "Skipping, since '${name}' was retrieved from your git config"
+    _skipping "'${name}' was retrieved from your git config"
   else
     [ -n "${YOUR_NAME}" ] &&
-      echo "Skipping, since '${YOUR_NAME}' was retrieved from your install config" &&
+      _skipping "'${YOUR_NAME}' was retrieved from your install config" &&
       return 0
 
     while true; do
@@ -2050,10 +2073,10 @@ ask_for_email() {
   set -o errexit
 
   if [ -n "${email}" ]; then
-    echo "Skipping, since '${email}' was retrieved from your git config"
+    _skipping "'${email}' was retrieved from your git config"
   else
     [ -n "${YOUR_EMAIL}" ] &&
-      echo "Skipping, since '${YOUR_EMAIL}' was retrieved from your install config" &&
+      _skipping "'${YOUR_EMAIL}' was retrieved from your install config" &&
       return 0
 
     while true; do
@@ -2217,7 +2240,7 @@ EOF
   curl -fsSL https://raw.githubusercontent.com/GitAlias/gitalias/main/gitalias.txt \
     --create-dirs -o "${XDG_CONFIG_HOME}/gitalias/gitalias.txt"
 
-  printf "\ngitalias configured\n"
+  printf "\nConfigured '%s'\n" "${XDG_CONFIG_HOME}/gitalias/gitalias.txt"
 }
 
 install_rust() {
@@ -2236,11 +2259,11 @@ install_rust() {
 
   # Install rustup if not already installed
   if [ ! -x "${rustup_bin}" ]; then
-    printf "\n\nRust not found, installing to %s...\n\n" "${RUST_LANG_HOME}"
+    printf "\n%bInstalling rust:%b\n\n" "${C_BLUE}" "${C_RESET}"
     curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | sh -s -- -y --no-modify-path
     rustup_bin="${CARGO_HOME}/bin/rustup"
   else
-    printf "\n\nRust already installed, updating...\n\n"
+    printf "\n%bUpdating rust:%b\n\n" "${C_BLUE}" "${C_RESET}"
     "${rustup_bin}" self update
     "${rustup_bin}" update
   fi
@@ -2263,16 +2286,16 @@ install_programming_languages() {
   done
 
   if ((${#mise_languages[@]} == 0)); then
-    echo "Skipping, since there's no languages set"
+    _skipping "No languages set"
     return
   fi
 
   for key in "${!mise_languages[@]}"; do
     [[ "${key}" = "0" || -z "${mise_languages[${key}]}" ]] && continue
 
-    printf "\nInstalling %s...\n\n" "${mise_languages[${key}]}"
+    printf "\n%bInstalling %b:%b\n\n" "${C_BLUE}" "${mise_languages["${key}"]}" "${C_RESET}"
     if command -v "${XDG_DATA_HOME}/mise/shims/${key}" 1>/dev/null; then
-      echo "Skipping, it's already installed, run 'mise upgrade ${key} --bump' to upgrade"
+      _skipping "Already installed, run 'mise upgrade ${key} --bump' to upgrade"
     else
       mise use --global "${mise_languages[${key}]}"
     fi
@@ -2509,7 +2532,7 @@ configure_tools() {
   mise x 1password-cli -- op completion zsh >"${XDG_DATA_HOME}/zsh/completions/_op"
   mise x kafkactl -- kafkactl completion zsh >"${XDG_DATA_HOME}/zsh/completions/_kafkactl"
 
-  printf "Completion has been configured for tools\n"
+  printf "\nConfigured completions\n"
 }
 
 completed_message() {
@@ -2792,7 +2815,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
   [ "${PULL}" == "1" ] && exit
 
-  check_install_config
+  compare_install_config
   ensure_sudo_works
   create_initial_dirs
   install_mise
