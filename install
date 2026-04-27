@@ -1614,7 +1614,7 @@ configure_sudoers_entries() {
     sudoers_entries["${key}"]="${SUDOERS_ENTRIES_EXTRAS[${key}]}"
   done
 
-  if [[ ${#sudoers_entries[@]} -eq 0 ]]; then
+  if ((${#sudoers_entries[@]} == 0)); then
     _skipping "No entries defined"
     return
   fi
@@ -1646,7 +1646,7 @@ configure_udev_rules() {
     return
   fi
 
-  declare -A udev_rules
+  declare -A udev_rules=()
 
   # Merge both arrays.
   for key in "${!UDEV_RULES[@]}"; do
@@ -1656,7 +1656,7 @@ configure_udev_rules() {
     udev_rules["${key}"]="${UDEV_RULES_EXTRAS[${key}]}"
   done
 
-  if [[ ${#udev_rules[@]} -eq 0 ]]; then
+  if ((${#udev_rules[@]} == 0)); then
     _skipping "No rules defined"
     return
   fi
@@ -1720,11 +1720,6 @@ configure_systemd_services() {
 configure_system_configs() {
   _info "CONFIGURE SYSTEM CONFIGS"
 
-  if [[ "${OS_DISTRO}" != "arch" && "${GUI_ENABLED}" != "1" ]]; then
-    _skipping "Only runs on Arch Linux or when GUI_LINUX=1 is set"
-    return
-  fi
-
   if [ "${OS_DISTRO}" = "arch" ]; then
     local etc_pacman_conf_path="/etc/pacman.conf"
     local changed="0"
@@ -1755,6 +1750,8 @@ configure_system_configs() {
     else
       echo "'${etc_pacman_conf_path}' has been updated"
     fi
+  else
+    _skipping "Only runs on Arch Linux based systems"
   fi
 
   if [ "${GUI_ENABLED}" == "1" ]; then
@@ -2031,22 +2028,19 @@ EOF
 }
 
 ask_for_name() {
-  _info "ASKING FOR YOUR NAME TO CONFIGURE GIT"
+  _info "ASKING FOR YOUR NAME"
 
   local config_file="${1}"
   local name=
 
-  set +o errexit
-  name="$(git config --file "${config_file}" user.name 2>/dev/null)"
-  set -o errexit
+  if [ -n "${YOUR_NAME}" ]; then
+    _skipping "'${YOUR_NAME}' was retrieved from your install config"
+    return 0
+  fi
 
-  if [ -n "${name}" ]; then
+  if name="$(git config --file "${config_file}" user.name)"; then
     _skipping "'${name}' was retrieved from your git config"
   else
-    [ -n "${YOUR_NAME}" ] &&
-      _skipping "'${YOUR_NAME}' was retrieved from your install config" &&
-      return 0
-
     while true; do
       printf "What is your full name (ie. Dade Murphy)? "
       read -r name
@@ -2063,22 +2057,19 @@ ask_for_name() {
 }
 
 ask_for_email() {
-  _info "ASKING FOR YOUR EMAIL TO CONFIGURE GIT"
+  _info "ASKING FOR YOUR EMAIL"
 
   local config_file="${1}"
   local email=
 
-  set +o errexit
-  email="$(git config --file "${config_file}" user.email 2>/dev/null)"
-  set -o errexit
+  if [ -n "${YOUR_EMAIL}" ]; then
+    _skipping "'${YOUR_EMAIL}' was retrieved from your install config"
+    return 0
+  fi
 
-  if [ -n "${email}" ]; then
+  if email="$(git config --file "${config_file}" user.email)"; then
     _skipping "'${email}' was retrieved from your git config"
   else
-    [ -n "${YOUR_EMAIL}" ] &&
-      _skipping "'${YOUR_EMAIL}' was retrieved from your install config" &&
-      return 0
-
     while true; do
       printf "What is your email address (ie. zerocool@example.com)? "
       read -r email
@@ -2285,7 +2276,7 @@ install_programming_languages() {
     mise_languages["${key}"]="${MISE_LANGUAGES_EXTRAS[${key}]}"
   done
 
-  if [[ ${#mise_languages[@]} -eq 0 ]]; then
+  if ((${#mise_languages[@]} == 0)); then
     _skipping "No languages set"
     return
   fi
@@ -2672,8 +2663,8 @@ ${C_WHITE}\`\`\`sh${C_RESET}
 CPU_ARCH="${CPU_ARCH}"
 
 OS_KERNEL="${OS_KERNEL}"
-OS_DISTRO="${OS_DISTRO}"
-OS_DISTRO_LIKE=${OS_DISTRO_LIKE}"
+OS_DISTRO="${OS_DISTRO_ORIGINAL}"
+OS_DISTRO_LIKE="${OS_DISTRO_LIKE}"
 
 OS_IN_WSL="${OS_IN_WSL}"
 OS_IN_CONTAINER="${OS_IN_CONTAINER}"
