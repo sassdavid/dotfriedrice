@@ -5,6 +5,31 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
+C_RED=$'\e[1;31;1m'
+C_GREEN=$'\e[1;32;1m'
+C_BLUE=$'\e[1;34;1m'
+C_CYAN=$'\e[1;36;1m'
+C_WHITE=$'\e[1;37;1m'
+C_RESET=$'\e[0m'
+
+_info() {
+  local message="${1}"
+  local pre_message="${2-\n\n}"
+  printf "%b%b:: %b%b\n\n" "${pre_message}" "${C_CYAN}" "${message}" "${C_RESET}"
+}
+
+_skipping() {
+  local message="${1}"
+  local pre_message="${2:-}"
+  printf "%b%bSkipping: %b%b\n" "${pre_message}" "${C_WHITE}" "${message}" "${C_RESET}"
+}
+
+_error() {
+  local message="${1}"
+  printf "%bError: %b%b\n" "${C_RED}" "${message}" "${C_RESET}" >&2
+  exit 1
+}
+
 default_install_path="$HOME/.local/bin"
 install_path="${1:-$default_install_path}"
 
@@ -36,8 +61,7 @@ get_os() {
     printf "macos"
     ;;
   *)
-    printf "Unsupported OS: %s\n" "$os" >&2
-    exit 1
+    _error "Unsupported OS: ${os}"
     ;;
   esac
 }
@@ -61,8 +85,7 @@ get_arch() {
     printf "arm64"
     ;;
   *)
-    printf "Unsupported architecture: %s\n" "$arch" >&2
-    exit 1
+    _error "Unsupported architecture: ${arch}"
     ;;
   esac
 }
@@ -94,10 +117,10 @@ install_or_update_tool() {
   local archive_type="${5:-.tgz}"
   local archive="$tmp_dir/${tool_name}${archive_type}"
 
-  printf "Removing old %s from %s if it exists...\n" "$tool_name" "$final_dir"
+  printf "%b  Removing old %s from %s if it exists...%b\n" "${C_BLUE}" "$tool_name" "$final_dir" "${C_RESET}"
   rm -rf "${final_dir:?}"
 
-  printf "Downloading %s from %s...\n" "$tool_name" "$url"
+  printf "%b  Downloading %s from %s...%b\n\n" "${C_BLUE}" "$tool_name" "$url" "${C_RESET}"
   curl -L -H "$auth_header" -o "$archive" "$url"
 
   if [[ $archive_type == ".zip" ]]; then
@@ -122,8 +145,7 @@ install_or_update_tool() {
   else
     tar --strip-components=1 -xzf "$archive" -C "$tmp_dir"
     if [[ ! -d "$tmp_dir/bin" ]]; then
-      printf "Error: bin/ folder not found after extracting!\n" >&2
-      exit 1
+      _error "bin/ folder not found after extracting!"
     fi
     mkdir -p "$final_dir"
     mv "$tmp_dir/bin/"* "$final_dir/"
@@ -131,10 +153,12 @@ install_or_update_tool() {
 
   chmod +x "$final_dir/"*
 
-  printf "%s installed to %s\n\n" "$tool_name" "$final_dir"
+  printf "\n%b%s installed to %s%b\n" "${C_GREEN}" "$tool_name" "$final_dir" "${C_RESET}"
 }
 
 install_or_update_mongosh() {
+  _info "INSTALL MONGOSH"
+
   local final_dir=$1
   local os
   os=$(get_os)
@@ -153,7 +177,7 @@ install_or_update_mongosh() {
   fi
 
   if [[ -z "$current_version" ]] || version_lt "$current_version" "$remote_version"; then
-    printf "mongosh: %s -> %s\n" "${current_version:-none}" "$remote_version"
+    printf "\n%bUpdating mongosh:%b %s -> %s\n\n" "${C_BLUE}" "${C_RESET}" "${current_version:-none}" "$remote_version"
     local tmp_dir
     tmp_dir=$(create_tmp_dir mongosh)
     tmp_dirs+=("$tmp_dir")
@@ -170,11 +194,13 @@ install_or_update_mongosh() {
     url="https://github.com/mongodb-js/mongosh/releases/download/${version_tag}/mongosh-${remote_version}-${platform_name}-${arch}${archive_ext}"
     install_or_update_tool mongosh "$url" "$tmp_dir" "$final_dir" "$archive_ext"
   else
-    printf "mongosh is up to date (%s)\n" "$current_version"
+    _skipping "mongosh is up to date (${current_version})"
   fi
 }
 
 install_or_update_mongodb_tools() {
+  _info "INSTALL MONGODB TOOLS"
+
   local final_dir=$1
   local os
   os=$(get_os)
@@ -195,7 +221,7 @@ install_or_update_mongodb_tools() {
   fi
 
   if [[ -z "$current_version" ]] || version_lt "$current_version" "$latest_version"; then
-    printf "mongodb-tools: %s -> %s\n" "${current_version:-none}" "$latest_version"
+    printf "\n%bUpdating mongodb-tools:%b %s -> %s\n\n" "${C_BLUE}" "${C_RESET}" "${current_version:-none}" "$latest_version"
     local tmp_dir
     tmp_dir=$(create_tmp_dir mongodbtools)
     tmp_dirs+=("$tmp_dir")
@@ -213,11 +239,13 @@ install_or_update_mongodb_tools() {
 
     install_or_update_tool mongodb-tools "$url" "$tmp_dir" "$final_dir" "$archive_ext"
   else
-    printf "mongodb-database-tools are up to date (%s)\n" "$current_version"
+    _skipping "mongodb-database-tools are up to date (${current_version})"
   fi
 }
 
 install_or_update_atlas_mongo_cli() {
+  _info "INSTALL ATLAS CLI"
+
   local final_dir=$1
   local os
   os=$(get_os)
@@ -241,7 +269,7 @@ install_or_update_atlas_mongo_cli() {
         sed -nEn 's/^atlascli version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*$/\1/p')
     fi
     if [[ -z "$current_version" ]] || version_lt "$current_version" "$atlas_version"; then
-      printf "atlas-cli: %s -> %s\n" "${current_version:-none}" "$atlas_version"
+      printf "\n%bUpdating atlas-cli:%b %s -> %s\n\n" "${C_BLUE}" "${C_RESET}" "${current_version:-none}" "$atlas_version"
       local tmp_dir
       tmp_dir=$(create_tmp_dir atlascli)
       tmp_dirs+=("$tmp_dir")
@@ -260,7 +288,7 @@ install_or_update_atlas_mongo_cli() {
 
       install_or_update_tool atlas-cli "$url" "$tmp_dir" "$final_dir" "$archive_ext"
     else
-      printf "atlas-cli is up to date (%s)\n" "$current_version"
+      _skipping "atlas-cli is up to date (${current_version})"
     fi
   fi
 
@@ -272,5 +300,5 @@ install_or_update_atlas_mongo_cli "$install_path/atlas-cli"
 
 if [[ -x "${install_path}/atlas-cli/atlas" ]]; then
   "${install_path}/atlas-cli/atlas" completion zsh >"${XDG_DATA_HOME}/zsh/completions/_atlas"
-  printf "atlas completion generated\n"
+  printf "\n%batlas completion generated%b\n" "${C_GREEN}" "${C_RESET}"
 fi
