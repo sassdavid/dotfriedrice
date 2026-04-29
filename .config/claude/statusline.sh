@@ -9,10 +9,16 @@ eval "$(echo "$input" | jq -r '
   @sh "SESSION_ID=\(.session_id // "default")",
   @sh "COST_TOTAL=\(.cost.total_cost_usd // 0)",
   @sh "DURATION_MS=\(.cost.total_duration_ms // 0)",
+  @sh "API_DURATION_MS=\(.cost.total_api_duration_ms // 0)",
   @sh "LINES_ADDED=\(.cost.total_lines_added // 0)",
   @sh "LINES_REMOVED=\(.cost.total_lines_removed // 0)",
   @sh "CONTEXT_SIZE=\(.context_window.context_window_size // 0)",
-  @sh "USED_PCT=\(.context_window.used_percentage // 0)"
+  @sh "USED_PCT=\(.context_window.used_percentage // 0)",
+  @sh "EFFORT_LEVEL=\(.effort.level // "")",
+  @sh "RATE_5H_PCT=\(.rate_limits.five_hour.used_percentage // "")",
+  @sh "RATE_5H_RESET=\(.rate_limits.five_hour.resets_at // "")",
+  @sh "RATE_7D_PCT=\(.rate_limits.seven_day.used_percentage // "")",
+  @sh "RATE_7D_RESET=\(.rate_limits.seven_day.resets_at // "")"
 ')"
 
 # ANSI colors
@@ -54,9 +60,15 @@ if [ -n "$BRANCH" ]; then
   [ "$MODIFIED" -gt 0 ] && GIT_INFO="${GIT_INFO} ${YELLOW}~${MODIFIED}${RESET}"
 fi
 
-echo -e "${CYAN}[${MODEL}]${RESET} ${CURRENT_DIR##*/}${GIT_INFO}"
+# --- Line 1: model [· effort], directory, git ---
 
-# --- Line 2: context progress bar, cost, duration, code changes ---
+MODEL_DISPLAY="${CYAN}[${MODEL}"
+[ -n "$EFFORT_LEVEL" ] && MODEL_DISPLAY="${MODEL_DISPLAY} · ${EFFORT_LEVEL}"
+MODEL_DISPLAY="${MODEL_DISPLAY}]${RESET}"
+
+echo -e "${MODEL_DISPLAY} ${CURRENT_DIR##*/}${GIT_INFO}"
+
+# --- Line 2: context progress bar, cost, duration, api duration, code changes ---
 
 # Truncate to integer
 PCT=${USED_PCT%.*}
@@ -86,11 +98,16 @@ if [ "$(echo "$COST_TOTAL > 0" | bc -l 2>/dev/null)" = "1" ]; then
   LINE2="${LINE2} ${DIM}|${RESET} ${YELLOW}${COST_FMT}${RESET}"
 fi
 
-# Wall-clock duration (only if > 0)
+# Wall-clock duration with API time alongside (only if > 0)
 if [ "$DURATION_MS" -gt 0 ]; then
   MINS=$((DURATION_MS / 60000))
   SECS=$(((DURATION_MS % 60000) / 1000))
   LINE2="${LINE2} ${DIM}|${RESET} ${MINS}m${SECS}s"
+  if [ "$API_DURATION_MS" -gt 0 ]; then
+    API_MINS=$((API_DURATION_MS / 60000))
+    API_SECS=$(((API_DURATION_MS % 60000) / 1000))
+    LINE2="${LINE2} ${DIM}(api ${API_MINS}m${API_SECS}s)${RESET}"
+  fi
 fi
 
 # Code changes (only if any)
@@ -99,3 +116,36 @@ if [ "$LINES_ADDED" -gt 0 ] || [ "$LINES_REMOVED" -gt 0 ]; then
 fi
 
 echo -e "$LINE2"
+
+# --- Line 3: rate limits (Claude.ai subscription only; absent on Bedrock/Vertex) ---
+
+if [ -n "$RATE_5H_PCT" ] || [ -n "$RATE_7D_PCT" ]; then
+  LINE3=""
+
+  if [ -n "$RATE_5H_PCT" ]; then
+    PCT_5H=$(printf '%.0f' "$RATE_5H_PCT")
+    if [ "$PCT_5H" -ge 90 ]; then COLOR_5H="$RED"
+    elif [ "$PCT_5H" -ge 70 ]; then COLOR_5H="$YELLOW"
+    else COLOR_5H="$GREEN"
+    fi
+    # stat -r is macOS, date -d @ is Linux
+    RESET_5H=$(date -r "$RATE_5H_RESET" "+%H:%M" 2>/dev/null || date -d "@$RATE_5H_RESET" "+%H:%M" 2>/dev/null)
+    PART_5H="${COLOR_5H}5h ${PCT_5H}%${RESET}"
+    [ -n "$RESET_5H" ] && PART_5H="${PART_5H} ${DIM}→ ${RESET_5H}${RESET}"
+    LINE3="$PART_5H"
+  fi
+
+  if [ -n "$RATE_7D_PCT" ]; then
+    PCT_7D=$(printf '%.0f' "$RATE_7D_PCT")
+    if [ "$PCT_7D" -ge 90 ]; then COLOR_7D="$RED"
+    elif [ "$PCT_7D" -ge 70 ]; then COLOR_7D="$YELLOW"
+    else COLOR_7D="$GREEN"
+    fi
+    RESET_7D=$(date -r "$RATE_7D_RESET" "+%a %H:%M" 2>/dev/null || date -d "@$RATE_7D_RESET" "+%a %H:%M" 2>/dev/null)
+    PART_7D="${COLOR_7D}7d ${PCT_7D}%${RESET}"
+    [ -n "$RESET_7D" ] && PART_7D="${PART_7D} ${DIM}→ ${RESET_7D}${RESET}"
+    [ -n "$LINE3" ] && LINE3="${LINE3} ${DIM}|${RESET} ${PART_7D}" || LINE3="$PART_7D"
+  fi
+
+  echo -e "$LINE3"
+fi

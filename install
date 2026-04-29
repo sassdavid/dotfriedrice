@@ -2501,8 +2501,6 @@ install_mise() {
 }
 
 install_mongodb_tools() {
-  _info "INSTALL OR UPDATE MONGODB TOOLS"
-
   "${DOTFILES_PATH}/.local/bin/install_mongodb_tools"
 }
 
