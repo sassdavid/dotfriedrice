@@ -2,7 +2,6 @@
 # Requires: usage CLI  https://github.com/jdx/usage
 #   Install: mise use -g usage   |   cargo install usage-cli
 # shellcheck shell=bash
-# shellcheck disable=SC2154  # usage_* vars are injected as env vars by the usage CLI
 
 #USAGE name "create_kafka_config"
 #USAGE about "Fetch MSK credentials from AWS Secrets Manager and write Kafka\nconfig for kafka shell binaries (.properties) and/or kafkactl (YAML context).\n\nSecret name convention: AmazonMSK_<project>.<stack>.level.0\nOnly SASL/SCRAM broker endpoints (port 9096). kafkactl mode requires yq v4+."
@@ -24,13 +23,15 @@
 #USAGE example "create_kafka_config --region eu-central-1 --profile my-profile --project myproject --stack prod --mode kafkactl --set-current-context"                                            header="kafkactl only, auto-detect brokers, set as active context"
 #USAGE example "create_kafka_config --region eu-central-1 --profile my-profile --project myproject --stack prod --mode kafkactl --brokers b-1.cluster.kafka.eu-central-1.amazonaws.com:9096"     header="kafkactl only, provide brokers explicitly"
 
-set -euo pipefail
+set -o errexit
+set -o pipefail
+set -o nounset
 
-region="${usage_region}"
-profile="${usage_profile}"
-project_tag="${usage_project}"
-stack_tag="${usage_stack}"
-mode="${usage_mode}"
+region="${usage_region:-}"
+profile="${usage_profile:-}"
+project_tag="${usage_project:-}"
+stack_tag="${usage_stack:-}"
+mode="${usage_mode:-properties}"
 brokers="${usage_brokers:-}"
 kafka_version="${usage_kafka_version:-}"
 context_name="${usage_context:-${project_tag}-${stack_tag}}"
@@ -251,14 +252,14 @@ write_kafkactl_config() {
 }
 
 case "${mode}" in
-properties)
-  write_properties
-  ;;
-kafkactl)
-  write_kafkactl_config
-  ;;
-both)
-  write_properties
-  write_kafkactl_config
-  ;;
+  properties)
+    write_properties
+    ;;
+  kafkactl)
+    write_kafkactl_config
+    ;;
+  both)
+    write_properties
+    write_kafkactl_config
+    ;;
 esac

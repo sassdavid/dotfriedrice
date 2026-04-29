@@ -1,0 +1,127 @@
+#!/usr/bin/env -S usage bash
+# Requires: usage CLI  https://github.com/jdx/usage
+#   Install: mise use -g usage   |   cargo install usage-cli
+# shellcheck shell=bash
+
+#USAGE name "claude_switch"
+#USAGE about "Switch the active Claude Code settings profile.\n\nUses ~/.claude/settings.json as a symlink pointing to the active profile.\nSettings live in the dotfiles repo under .config/claude/:\n  settings_personal.json        — tracked, no secrets\n  settings_bedrock.json.local   — gitignored, contains AWS credentials\n  settings_bedrock.json.example — tracked template; used to bootstrap .local"
+#USAGE arg "[mode]" help="Profile to activate (default: status)" default="status" {
+#USAGE   choices "personal" "bedrock" "status"
+#USAGE }
+#USAGE flag "--profile <profile>" help="AWS SSO profile name (required for bedrock; updates .local if changed)"
+#USAGE flag "--region <region>"   help="AWS region (required for bedrock; updates .local if changed)"
+#USAGE example "claude_switch personal"                                                   header="Switch to personal subscription"
+#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2"  header="Switch to bedrock (bootstraps .local from example if missing)"
+#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-east-1"  header="Switch to bedrock and update credentials in .local"
+#USAGE example "claude_switch status"                                                     header="Show current active profile"
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+dotfiles_claude="${DOTFILES_PATH:-${HOME}/src/github/dotfiles}/.config/claude"
+target="${HOME}/.claude/settings.json"
+personal="${dotfiles_claude}/settings_personal.json"
+bedrock="${dotfiles_claude}/settings_bedrock.json.local"
+bedrock_example="${dotfiles_claude}/settings_bedrock.json.example"
+
+mode="${usage_mode:-status}"
+aws_profile="${usage_profile:-}"
+aws_region="${usage_region:-}"
+
+_status() {
+  if [[ -L "${target}" ]]; then
+    real="$(readlink "${target}")"
+    case "${real}" in
+      *personal*) echo "current: personal" ;;
+      *bedrock*)
+        local aws_prof
+        aws_prof="$(jq -r '.env.AWS_PROFILE // ""' "${real}" 2>/dev/null)"
+        if [[ -n "${aws_prof}" ]]; then
+          echo "current: bedrock (${aws_prof})"
+        else
+          echo "current: bedrock"
+        fi
+        ;;
+      *) echo "current: unknown → ${real}" ;;
+    esac
+  elif [[ ! -e "${target}" ]]; then
+    printf 'No active profile: %s does not exist\nRun: claude_switch bedrock|personal\n' "${target}" >&2
+  else
+    printf 'No active profile: %s is not a symlink\nRun: claude_switch bedrock|personal\n' "${target}" >&2
+  fi
+}
+
+_bootstrap_bedrock() {
+  if [[ ! -f "${bedrock}" ]]; then
+    if [[ ! -f "${bedrock_example}" ]]; then
+      printf 'Error: example file not found: %s\n' "${bedrock_example}" >&2
+      exit 1
+    fi
+    cp "${bedrock_example}" "${bedrock}"
+    printf 'Bootstrapped %s from example\n' "${bedrock}"
+  fi
+}
+
+_update_bedrock_credentials() {
+  local file="${1}" profile="${2}" region="${3}"
+
+  local current_profile current_region
+  current_profile="$(jq -r '.env.AWS_PROFILE // ""' "${file}")"
+  current_region="$(jq -r '.env.AWS_REGION // ""' "${file}")"
+
+  local profile_changed=false region_changed=false
+  [[ -n "${profile}" && "${current_profile}" != "${profile}" ]] && profile_changed=true
+  [[ -n "${region}" && "${current_region}" != "${region}" ]] && region_changed=true
+
+  if [[ "${profile_changed}" == "false" && "${region_changed}" == "false" ]]; then
+    return 0
+  fi
+
+  local tmp
+  tmp="$(mktemp)"
+  # shellcheck disable=SC2064
+  trap "rm -f '${tmp}'" RETURN
+
+  jq --arg p "${profile}" --arg r "${region}" \
+    --argjson pc "${profile_changed}" --argjson rc "${region_changed}" '
+    if $pc then .awsAuthRefresh = "aws sso login --profile \($p)" | .env.AWS_PROFILE = $p else . end |
+    if $rc then .env.AWS_DEFAULT_REGION = $r | .env.AWS_REGION = $r else . end
+  ' "${file}" >"${tmp}" && mv "${tmp}" "${file}"
+
+  "${profile_changed}" && printf 'Updated AWS_PROFILE → %s\n' "${profile}" || true
+  "${region_changed}" && printf 'Updated AWS_REGION → %s\n' "${region}" || true
+  printf 'Credentials updated in %s\n' "${bedrock}"
+}
+
+if [[ "${mode}" == "bedrock" ]]; then
+  [[ -n "${aws_profile}" ]] || {
+    printf 'Error: --profile is required when switching to bedrock\n' >&2
+    exit 1
+  }
+  [[ -n "${aws_region}" ]] || {
+    printf 'Error: --region is required when switching to bedrock\n' >&2
+    exit 1
+  }
+fi
+
+case "${mode}" in
+  personal)
+    [[ -f "${personal}" ]] || {
+      printf 'Error: %s not found\n' "${personal}" >&2
+      exit 1
+    }
+    ln -sfn "${personal}" "${target}"
+    printf 'Switched to personal config\n'
+    ;;
+  bedrock)
+    _bootstrap_bedrock
+    [[ -n "${aws_profile}" || -n "${aws_region}" ]] \
+      && _update_bedrock_credentials "${bedrock}" "${aws_profile}" "${aws_region}"
+    ln -sfn "${bedrock}" "${target}"
+    printf 'Switched to bedrock config\n'
+    ;;
+  status)
+    _status
+    ;;
+esac
