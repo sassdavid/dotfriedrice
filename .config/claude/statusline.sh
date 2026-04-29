@@ -124,9 +124,12 @@ if [ -n "$RATE_5H_PCT" ] || [ -n "$RATE_7D_PCT" ]; then
 
   if [ -n "$RATE_5H_PCT" ]; then
     PCT_5H=$(printf '%.0f' "$RATE_5H_PCT")
-    if [ "$PCT_5H" -ge 90 ]; then COLOR_5H="$RED"
-    elif [ "$PCT_5H" -ge 70 ]; then COLOR_5H="$YELLOW"
-    else COLOR_5H="$GREEN"
+    if [ "$PCT_5H" -ge 90 ]; then
+      COLOR_5H="$RED"
+    elif [ "$PCT_5H" -ge 70 ]; then
+      COLOR_5H="$YELLOW"
+    else
+      COLOR_5H="$GREEN"
     fi
     # stat -r is macOS, date -d @ is Linux
     RESET_5H=$(date -r "$RATE_5H_RESET" "+%H:%M" 2>/dev/null || date -d "@$RATE_5H_RESET" "+%H:%M" 2>/dev/null)
@@ -137,9 +140,12 @@ if [ -n "$RATE_5H_PCT" ] || [ -n "$RATE_7D_PCT" ]; then
 
   if [ -n "$RATE_7D_PCT" ]; then
     PCT_7D=$(printf '%.0f' "$RATE_7D_PCT")
-    if [ "$PCT_7D" -ge 90 ]; then COLOR_7D="$RED"
-    elif [ "$PCT_7D" -ge 70 ]; then COLOR_7D="$YELLOW"
-    else COLOR_7D="$GREEN"
+    if [ "$PCT_7D" -ge 90 ]; then
+      COLOR_7D="$RED"
+    elif [ "$PCT_7D" -ge 70 ]; then
+      COLOR_7D="$YELLOW"
+    else
+      COLOR_7D="$GREEN"
     fi
     RESET_7D=$(date -r "$RATE_7D_RESET" "+%a %H:%M" 2>/dev/null || date -d "@$RATE_7D_RESET" "+%a %H:%M" 2>/dev/null)
     PART_7D="${COLOR_7D}7d ${PCT_7D}%${RESET}"
