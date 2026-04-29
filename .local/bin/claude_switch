@@ -111,14 +111,14 @@ case "${mode}" in
       printf 'Error: %s not found\n' "${personal}" >&2
       exit 1
     }
-    ln -sfn "${personal}" "${target}"
+    ln -fns "${personal}" "${target}"
     printf 'Switched to personal config\n'
     ;;
   bedrock)
     _bootstrap_bedrock
     [[ -n "${aws_profile}" || -n "${aws_region}" ]] \
       && _update_bedrock_credentials "${bedrock}" "${aws_profile}" "${aws_region}"
-    ln -sfn "${bedrock}" "${target}"
+    ln -fns "${bedrock}" "${target}"
     printf 'Switched to bedrock config\n'
     ;;
   status)
