@@ -1,5 +1,4 @@
 # shellcheck shell=bash
-# bashsupport disable=BP5006
 
 # This file runs once at login.
 
@@ -31,17 +30,19 @@ export PATH="${PATH}:${MONGOSH_HOME}:${MONGODB_TOOLS_HOME}:${ATLAS_CLI_HOME}"
 export EDITOR="nvim"
 export DIFFPROG="nvim -d"
 
-# Add colors to the less and man commands.
-export LESS=-R
-LESS_TERMCAP_ue="$(printf '%b' '[0m')"
-export LESS_TERMCAP_ue
-export LESS_TERMCAP_mb=$'\e[1;31mm'   # begin blinking
+# Add colors to the less command.
+export LESS="-R"
+export LESS_TERMCAP_mb=$'\e[1;31m'    # begin blinking
 export LESS_TERMCAP_md=$'\e[1;36m'    # begin bold
-export LESS_TERMCAP_us=$'\e[1;332m'   # begin underline
-export LESS_TERMCAP_so=$'\e[1;44;33m' # begin standout-mode - info box
+export LESS_TERMCAP_us=$'\e[1;32m'    # begin underline
+export LESS_TERMCAP_so=$'\e[1;30;44m' # begin standout-mode - info box
 export LESS_TERMCAP_me=$'\e[0m'       # end mode
 export LESS_TERMCAP_ue=$'\e[0m'       # end underline
 export LESS_TERMCAP_se=$'\e[0m'       # end standout-mode
+
+# Use bat to color up the man pages.
+export MANROFFOPT="-c"
+export MANPAGER="sh -c 'col -bx | bat --language man --plain'"
 
 # Configure GPG.
 export GNUPGHOME="${XDG_CONFIG_HOME}/gnupg"

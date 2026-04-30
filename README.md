@@ -478,7 +478,7 @@ get it added to this project.
 Nothing here is too specific to these dotfiles, it's general knowledge on
 setting up Arch but I wanted to include these steps to help get you going.
 
-#### Set up a bootable USB drive
+#### Create a bootable USB drive
 
 - Obtain a USB drive (a few gigs is fine)
 - Download the [official Arch ISO](https://fastly.mirror.pkgbuild.com/iso/latest/)
@@ -490,7 +490,7 @@ setting up Arch but I wanted to include these steps to help get you going.
 
 #### After booting from the USB drive
 
-- Following any instructions it says before running `archinstall`
+- Follow any instructions it says before running `archinstall`
   - For example if you use Wi-Fi you'll want to run `iwctl` to [set up your network](https://wiki.archlinux.org/title/Iwd#iwctl):
     - `iwctl`
       - `device list` shows devices such as `wlan0` which we'll use below
