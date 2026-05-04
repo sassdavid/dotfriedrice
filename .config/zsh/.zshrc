@@ -50,7 +50,7 @@ if type "${HOME}/.local/bin/mise" &>/dev/null; then
 fi
 eval "$("${HOME}/.local/bin/mise" hook-env)"
 
-eval "$($(which fnox) activate zsh)"
+eval "$($(which fnox) activate "$SHELL_NAME")"
 
 # Use modern completion system. Other than enabling globdots for showing
 # hidden files, these ares values in the default generated zsh config.
@@ -153,36 +153,40 @@ zstyle ":fzf-tab:complete:cd:*" fzf-preview "ls --color=always \${realpath}"
 if [ -f "${XDG_CONFIG_HOME}/zsh/.aliases.local" ]; then . "${XDG_CONFIG_HOME}/zsh/.aliases.local"; fi
 
 # Set autosuggestions
-eval "$("${HOME}/.local/bin/mise" completion zsh)"
+eval "$("${HOME}/.local/bin/mise" completion "$SHELL_NAME")"
 
 complete -C "$(which aws_completer)" aws
 complete -C "$(which terraform)" terraform
 complete -C "$(which terragrunt)" -C "$(which terraform)" terragrunt
 
 # shellcheck disable=SC1090
-. <(argocd completion zsh)
+. <(argocd completion "$SHELL_NAME")
 # shellcheck disable=SC1090
-. <(dua completions zsh)
+. <(dua completions "$SHELL_NAME")
 # shellcheck disable=SC1090
-. <(fnox completion zsh)
+. <(fnox completion "$SHELL_NAME")
 # shellcheck disable=SC1090
-. <(gh completion -s zsh)
+. <(gh completion -s "$SHELL_NAME")
 # shellcheck disable=SC1090
-. <(golangci-lint completion zsh)
+. <(golangci-lint completion "$SHELL_NAME")
 # shellcheck disable=SC1090
-. <(helm completion zsh)
+. <(helm completion "$SHELL_NAME")
 # shellcheck disable=SC1090
-. <(k9s completion zsh)
+. <(k9s completion "$SHELL_NAME")
 # shellcheck disable=SC1090
-. <(kubectl completion zsh)
+. <(kubectl completion "$SHELL_NAME")
 # shellcheck disable=SC1090
-. <(ruff generate-shell-completion zsh)
+. <(ruff generate-shell-completion "$SHELL_NAME")
 # shellcheck disable=SC1090
-. <(terraform-docs completion zsh)
+. <(terraform-docs completion "$SHELL_NAME")
 # shellcheck disable=SC1090
-. <(uv generate-shell-completion zsh)
+. <(usage --completions "$SHELL_NAME")
 # shellcheck disable=SC1090
-. <(yq shell-completion zsh)
+. <(usage generate completion-init "$SHELL_NAME")
+# shellcheck disable=SC1090
+. <(uv generate-shell-completion "$SHELL_NAME")
+# shellcheck disable=SC1090
+. <(yq shell-completion "$SHELL_NAME")
 
 # eval additional
-eval "$(zoxide init --cmd cd zsh)"
+eval "$(zoxide init --cmd cd "$SHELL_NAME")"
