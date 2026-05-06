@@ -4,7 +4,7 @@
 # shellcheck shell=bash
 
 #USAGE name "claude_switch"
-#USAGE about "Switch the active Claude Code settings profile.\n\nUses ~/.claude/settings.json as a symlink pointing to the active profile.\nSettings live in the dotfiles repo under .config/claude/:\n  settings_personal.json        — tracked, no secrets\n  settings_bedrock.json.local   — gitignored, contains AWS credentials\n  settings_bedrock.json.example — tracked template; used to bootstrap .local"
+#USAGE about "Switch the active Claude Code settings profile.\n\nUses ~/.claude/settings.json as a symlink pointing to the active profile.\nSettings live in the dotfriedrice repo under .config/claude/:\n  settings_personal.json        — tracked, no secrets\n  settings_bedrock.json.local   — gitignored, contains AWS credentials\n  settings_bedrock.json.example — tracked template; used to bootstrap .local"
 #USAGE arg "[mode]" help="Profile to activate (default: status)" default="status" {
 #USAGE   choices "personal" "bedrock" "status"
 #USAGE }
@@ -19,11 +19,11 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-dotfiles_claude="${DOTFILES_PATH:-${HOME}/src/github/dotfiles}/.config/claude"
+dotfriedrice_claude="${DOTFRIEDRICE_PATH:-${HOME}/src/github/dotfriedrice}/.config/claude"
 target="${HOME}/.claude/settings.json"
-personal="${dotfiles_claude}/settings_personal.json"
-bedrock="${dotfiles_claude}/settings_bedrock.json.local"
-bedrock_example="${dotfiles_claude}/settings_bedrock.json.example"
+personal="${dotfriedrice_claude}/settings_personal.json"
+bedrock="${dotfriedrice_claude}/settings_bedrock.json.local"
+bedrock_example="${dotfriedrice_claude}/settings_bedrock.json.example"
 
 mode="${usage_mode:-status}"
 aws_profile="${usage_profile:-}"

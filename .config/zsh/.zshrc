@@ -1,5 +1,4 @@
 # shellcheck shell=bash
-# bashsupport disable=BP5006
 
 # Load colors so we can access $fg and more.
 autoload -U colors && colors
@@ -29,7 +28,7 @@ PROMPT='%B%{$fg[green]%}%n@%{$fg[green]%}%M %{$fg[blue]%}%~%{$fg[yellow]%}$(git_
 export PROMPT
 
 # History settings.
-export HISTFILE="${DOTFILES_PATH}/.config/zsh/.zsh_history"
+export HISTFILE="${DOTFRIEDRICE_PATH}/.config/zsh/.zsh_history"
 export HISTTIMEFORMAT="%Y/%m/%d %H:%M:%S:   "
 export HISTSIZE=50000       # History lines stored in mememory.
 export SAVEHIST=50000       # History lines stored on disk.

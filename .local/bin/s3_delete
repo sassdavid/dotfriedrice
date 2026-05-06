@@ -1,0 +1,102 @@
+#!/usr/bin/env -S usage bash
+# Requires: usage CLI  https://github.com/jdx/usage
+#   Install: mise use -g usage   |   cargo install usage-cli
+# shellcheck shell=bash
+
+#USAGE name "s3_delete"
+#USAGE about "Delete all object versions and delete markers from a versioned S3 bucket.\nProcesses in batches of up to 1000 with parallel deletion. Loops until the bucket is empty.\n\nRequires: aws-cli v2, jq"
+#USAGE complete "profile" run="aws configure list-profiles 2>/dev/null"
+#USAGE flag "--bucket <bucket>"        required=#true  help="S3 bucket name"
+#USAGE flag "--profile <profile>"      required=#true  help="AWS CLI profile name"
+#USAGE flag "--region <region>"        required=#true  help="AWS region (e.g. eu-west-3)" {
+#USAGE   choices "ap-northeast-1" "ap-northeast-2" "ap-northeast-3" "ap-south-1" "ap-southeast-1" "ap-southeast-2" "ap-southeast-3" "ca-central-1" "eu-central-1" "eu-north-1" "eu-west-1" "eu-west-2" "eu-west-3" "me-central-1" "sa-east-1" "us-east-1" "us-east-2" "us-west-1" "us-west-2"
+#USAGE }
+#USAGE flag "--concurrency <n>"        default="10"    help="Max parallel delete jobs"
+#USAGE flag "--batch-size <n>"         default="1000"  help="Objects per delete batch (max 1000)"
+#USAGE example "s3_delete --bucket my-versioned-bucket --profile my-profile --region eu-west-3"
+#USAGE example "s3_delete --bucket my-versioned-bucket --profile my-profile --region eu-west-3 --concurrency 5"
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+bucket="${usage_bucket:-}"
+profile="${usage_profile:-}"
+region="${usage_region:-}"
+max_concurrent="${usage_concurrency:-10}"
+batch_size="${usage_batch_size:-1000}"
+
+start_time=$(date +%s)
+
+log_info() {
+  local -r green='\033[0;32m'
+  local -r nc='\033[0m'
+  printf "%s %b[INFO]%b %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "${green}" "${nc}" "$*"
+}
+
+log_error() {
+  local -r red='\033[0;31m'
+  local -r nc='\033[0m'
+  printf "%s %b[ERROR]%b %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "${red}" "${nc}" "$*" >&2
+}
+
+aws_args=(--bucket "${bucket}" --profile "${profile}" --region "${region}" --no-cli-pager)
+
+delete_batch() {
+  local batch_file="$1"
+  local batch_label="$2"
+
+  if aws s3api delete-objects "${aws_args[@]}" --delete "file://${batch_file}" >/dev/null; then
+    log_info "Batch ${batch_label}: deleted."
+  else
+    log_error "Batch ${batch_label}: deletion failed."
+  fi
+
+  rm -f "${batch_file}"
+}
+
+log_info "Starting deletion for bucket: ${bucket}"
+
+tmp_dir=$(mktemp -d /tmp/s3_delete_XXXXXX)
+trap 'rm -rf "${tmp_dir}"' EXIT
+
+round=0
+while :; do
+  round=$((round + 1))
+
+  # Single API call; jq merges Versions + DeleteMarkers, guarding against null fields
+  raw_json=$(aws s3api list-object-versions "${aws_args[@]}" --output json 2>/dev/null || echo '{}')
+  jq -r '(.Versions // []) + (.DeleteMarkers // []) | map({Key, VersionId})' \
+    <<<"${raw_json}" >"${tmp_dir}/delete-list.json"
+
+  object_count=$(jq 'length' "${tmp_dir}/delete-list.json")
+
+  if ((object_count == 0)); then
+    log_info "No more objects to delete. Done."
+    break
+  fi
+
+  log_info "Round ${round}: ${object_count} objects found — deleting in batches of ${batch_size}..."
+
+  batch_num=0
+  for ((i = 0; i < object_count; i += batch_size)); do
+    batch_num=$((batch_num + 1))
+    batch_file="${tmp_dir}/batch-r${round}-b${batch_num}.json"
+
+    jq --argjson start "${i}" --argjson size "${batch_size}" \
+      '{Objects: .[$start:$start+$size]}' \
+      "${tmp_dir}/delete-list.json" >"${batch_file}"
+
+    delete_batch "${batch_file}" "r${round}/b${batch_num}" &
+
+    # Throttle: arithmetic expansion handles leading whitespace from wc -l on macOS
+    while (($(jobs -rp | wc -l) >= max_concurrent)); do
+      sleep 0.5
+    done
+  done
+
+  wait
+done
+
+end_time=$(date +%s)
+log_info "Completed in $((end_time - start_time))s."
