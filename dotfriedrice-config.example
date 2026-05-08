@@ -165,9 +165,9 @@ export MISE_LANGUAGES_EXTRAS
 # they would be standalone scripts and tools that aren't in a package manager.
 #
 # For skipping, supply the name of the script, for example "invoice" but for
-# everything else you must supply the RAW_GITHUB_URL|VERSION_COMMAND, example
-# (Nick Janetakis's notes script):
-#SCRIPTS_INSTALL_EXTRAS["notes"]="https://raw.githubusercontent.com/nickjj/notes/v0.3.1/notes|--version"
+# everything else you must supply the RAW_GITHUB_URL|VERSION_COMMAND, example:
+# (Nick Janetakis's notes script)
+#   "https://raw.githubusercontent.com/nickjj/notes/v0.3.1/notes|--version"
 #
 # The version is used to avoid downloading the same copy on every run.
 #

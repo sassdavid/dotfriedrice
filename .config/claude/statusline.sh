@@ -18,7 +18,8 @@ eval "$(echo "$input" | jq -r '
   @sh "RATE_5H_PCT=\(.rate_limits.five_hour.used_percentage // "")",
   @sh "RATE_5H_RESET=\(.rate_limits.five_hour.resets_at // "")",
   @sh "RATE_7D_PCT=\(.rate_limits.seven_day.used_percentage // "")",
-  @sh "RATE_7D_RESET=\(.rate_limits.seven_day.resets_at // "")"
+  @sh "RATE_7D_RESET=\(.rate_limits.seven_day.resets_at // "")",
+  @sh "EXCEEDS_200K=\(.exceeds_200k_tokens // false)"
 ')"
 
 # ANSI colors
@@ -90,7 +91,14 @@ BAR=""
 [ "$FILLED" -gt 0 ] && BAR=$(printf "%${FILLED}s" | tr ' ' '█')
 [ "$EMPTY" -gt 0 ] && BAR="${BAR}$(printf "%${EMPTY}s" | tr ' ' '░')"
 
-LINE2="${BAR_COLOR}${BAR}${RESET} ${PCT}%"
+if [ "$CONTEXT_SIZE" -ge 900000 ]; then
+  CTX_LABEL="1M"
+else
+  CTX_LABEL="200k"
+fi
+
+LINE2="${BAR_COLOR}${BAR}${RESET} ${PCT}% ${DIM}${CTX_LABEL}${RESET}"
+[ "$EXCEEDS_200K" = "true" ] && LINE2="${LINE2} ${RED}>200k${RESET}"
 
 # Cost (only if > 0)
 if [ "$(echo "$COST_TOTAL > 0" | bc -l 2>/dev/null)" = "1" ]; then

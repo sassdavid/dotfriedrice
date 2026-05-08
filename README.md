@@ -65,7 +65,9 @@ XP, 7, 10 and also macOS on company issued laptops. Nothing I have ever used in
 ~25 years has approached how I feel using this set up. It's not even close (yes
 I tried Hyprland too).
 
-Nick Janetakis recorded a [demo video](https://www.youtube.com/watch?v=7XmD5UyyhZQ) showcasing niri day-to-day — worth watching, though this repo evolves so the video may not reflect the latest state.
+Nick Janetakis recorded a [demo video](https://www.youtube.com/watch?v=7XmD5UyyhZQ)
+showcasing niri day-to-day — worth watching, though this repo evolves so the video
+may not reflect the latest state.
 
 ### Packages, scripts and more
 
@@ -86,18 +88,20 @@ packages, standalone scripts, programming languages and more.
     - [1Password SSH Agent Integration](#1password-ssh-agent-integration)
 - [FAQ](#-faq)
   - [How to personalize DotFriedRice?](#how-to-personalize-dot-fried-rice)
-  - [How to theme custom apps?](#how-to-theme-custom-apps)
+  - [How to theme custom apps?](#how-to-get-theme-custom-apps)
   - [How to add custom themes?](#how-to-add-custom-themes)
   - [How to install Arch Linux?](#how-to-install-arch-linux)
-  - [How do I get started with the desktop environment?](#how-do-i-get-started-with-the-desktop-environment)
+  - [How to get started with the desktop environment?](#how-to-get-started-with-the-desktop-environment)
   - [How much resources does the desktop environment use?](#how-much-resources-does-the-desktop-environment-use)
+  - [How to get set up on Windows to install WSL 2 and a distro?](#how-to-get-set-up-on-windows-to-install-wsl-2-and-a-distro)
   - [Where is the original Vim config?](#where-is-the-original-vim-config)
 - [Feedback and Code Contributions](#-feedback-and-code-contributions)
 - [About the Author](#-about-the-author)
 
 ## 🎨 Themes
 
-Themes are chosen for strong contrast ratios and clear visibility in recordings, following the approach from [Nick Janetakis's channel](https://www.youtube.com/@NickJanetakis/videos). DFR
+Themes are chosen for strong contrast ratios and clear visibility in recordings,
+following the approach from [Nick Janetakis's channel](https://www.youtube.com/@NickJanetakis/videos). DFR
 (DotFriedRice) supports easily switching between themes and you can create
 custom themes too.
 
@@ -126,7 +130,9 @@ dfr-theme-set THEME_NAME
 
 When switching themes all GTK apps will live update (Firefox, Thunar, GIMP,
 etc.) and most terminal apps will live update too. If you have a bunch of
-shells already open in tmux you can run the `SZ` alias — Nick Janetakis's [source zsh](https://nickjanetakis.com/blog/running-commands-in-all-tmux-sessions-windows-and-panes) technique — to source new theme related configs.
+shells already open in tmux you can run the `SZ` alias — Nick Janetakis's
+[source zsh](https://nickjanetakis.com/blog/running-commands-in-all-tmux-sessions-windows-and-panes)
+technique — to source new theme related configs.
 
 ### Wallpapers
 
@@ -148,13 +154,13 @@ it's under the `wallpaper.synergy` object.
 
 There's an automated script to get you going quickly (we'll go over running it
 soon). It handles checking system compatibility and installing / configuring
-everything.
+everything in a few minutes.
 
 You'll be able to choose where you want to clone DotFriedRice to and also
 have an opportunity to review and edit what gets installed if you have
 different tastes.
 
-### 🌱 On a fresh system?
+### 🌱 On a fresh system where you'll be running Arch Linux?
 
 If you plan to use the desktop environment you'll want to set up a bootable USB
 stick with the official [Arch Linux
@@ -162,29 +168,28 @@ ISO](https://fastly.mirror.pkgbuild.com/iso/latest/) and then run the official
 [archinstall](https://wiki.archlinux.org/title/Archinstall) script. There is a
 [FAQ item covering that](#how-to-install-arch-linux) with video guides.
 
-Also, we're in a catch-22 where this project will set everything up for you but
-to start using it you need `curl` to download the bootstrap script.
+### 🔌 On an existing system (WSL 2, macOS or native Linux)?
 
-#### Arch Linux and macOS
+**For the command line version**, it's unlikely you'll run into any conflicts
+when installing DotFriedRice.
 
-You're good to go and don't need to do anything since `curl` is installed by
-default.
+If you're on WSL 2, there's a dedicated FAQ item for [getting set up with WSL 2
+and installing a
+distro](#how-to-get-set-up-on-windows-to-install-wsl-2-and-a-distro). Please
+follow that before installing DotFriedRice.
 
-#### Debian / Ubuntu
+If you're on macOS, you're good to and don't need to do anything extra.
 
-```sh
-# You can run this as root.
-apt-get update && apt-get install --yes --no-install-recommends curl
-```
+If you're on an Arch based distro, you're good to go and don't need to do anything extra.
 
-### 🔌 On an existing system?
+If you're on Debian / Ubuntu the only thing you need installed ahead of time is
+`curl` which you can do with `apt-get update && apt-get install --yes
+--no-install-recommends curl`.
 
-For the command line version, it's unlikely you'll run into any conflicts when
-installing DotFriedRice.
-
-For the desktop environment, DotFriedRice won't modify other environments you
-have. It will install everything and configure your user's shell to launch niri
-after logging in. It won't interfere with a login manager if you have one.
+**For the desktop environment** on Arch based distros, DotFriedRice won't modify
+other environments you have. It will install everything and configure your
+user's shell to launch niri after logging in. It won't interfere with a login
+manager if you have one.
 
 With that said, if you plan to go all-in with the desktop environment it's
 worth considering [backing up your files](https://github.com/nickjj/bmsu) (Nick Janetakis's bmsu script) and
@@ -228,40 +233,45 @@ your local terminal's config will not get automatically updated.*
 
 **🚀 Keeping things up to date and tinkering**
 
-Once you've installed DotFriedRice you can run `cd "${DOTFRIEDRICE_PATH}"` to
+Once you've installed DotFriedRice you can run `cd $DOTFRIEDRICE_PATH` to
 manage it moving forward. There's also the `dfr` alias to move into that
-directory and open it in Neovim.
+directory and open it in your configured editor.
 
-Here's a few handy commands, you can run `./dotfriedrice --help` to see all of them:
+Here's a few handy commands you can run from anywhere:
 
-- `./dotfriedrice`
-  - Install everything based on the local copy of DotFriedRice (you can run this regularly)
-  - Keeps your system up to date or apply local changes
-- `./dotfriedrice --skip-system-packages | -S`
+- `dotfriedrice`
+  - Install everything based on your local copy of DotFriedRice (you can run this regularly)
+  - Keeps your system up to date and applies local config changes
+- `dotfriedrice --skip-system-packages | -S`
   - The same as above but skip installing or updating packages
   - Helps regenerate symlinks, configs and everything else without modifying packages
-- `./dotfriedrice pull`
+- `dotfriedrice pull`
   - Pulls in the latest remote commits but doesn't install anything
   - Lets you review any changes locally before you install anything
-- `./dotfriedrice diff-config`
+- `dotfriedrice update`
+  - Pulls in the latest remote commits and installs everything
+  - Shortcut to pull and install in 1 command
+- `dotfriedrice diff-config`
   - Compare your local `dotfriedrice-config` to the local `dotfriedrice-config.example`
   - Helps keep your git ignored `dotfriedrice-config` in sync with new options
-- `./dotfriedrice diff`
+- `dotfriedrice diff`
   - Compare what you have locally vs the latest remote commits
-  - See what will change if you `./dotfriedrice pull` without modifying your git tree
-- `./dotfriedrice new-commits`
+  - See what will change if you `dotfriedrice pull` without modifying your git tree
+- `dotfriedrice new-commits`
   - Show new remote commits that do not exist locally
   - Present a quick list of what's available to pull locally
-- `./dotfriedrice changelog`
+- `dotfriedrice changelog`
   - Show all remote commits
-  - Present a quick list of all commits to see what has changed
-- `./dotfriedrice local-files`
+  - Present a quick list of all commits to see what has changed over time
+- `dotfriedrice local-files`
   - Show all local git ignored files such as configs, history and scripts
   - Useful to see everything not committed and for optionally backing up those files
-    - Example: `./dotfriedrice local-files | xargs zip local-files.zip`
-- `./dotfriedrice debug`
+    - Example: `dotfriedrice local-files | xargs zip local-files.zip`
+- `dotfriedrice debug`
   - Show DotFriedRice environment and system information
   - Can be used to help report issues and check your system stats
+
+You can always see a list of commands by running `dotfriedrice --help`.
 
 ### 🍚 Make it your own
 
@@ -402,7 +412,7 @@ For SSH commit signing see the [Git identities](#git-identities) section above.
 The [dotfriedrice-config](./dotfriedrice-config.example) lets you customize a
 few things but chances are you'll want to personalize more than what's there,
 such as various Neovim settings. Since this is a git repo you can always do a
-`./dotfriedrice pull` or `git pull` to get the most up to date code, but then
+`dotfriedrice pull` or `git pull` to get the most up to date code, but then
 you may find yourself clobbering over your changes.
 
 We have a few reasonable options without custom branches or forking:
@@ -457,7 +467,8 @@ setting up Arch but I wanted to include these steps to help get things cooking.
 
 #### Create a bootable USB drive
 
-Here's a [written and video tutorial](https://nickjanetakis.com/blog/create-bootable-arch-usb-on-linux-macos-with-cat-or-rufus-on-windows) by Nick Janetakis for Windows, Linux and macOS.
+Here's a [written and video tutorial](https://nickjanetakis.com/blog/create-bootable-arch-usb-on-linux-macos-with-cat-or-rufus-on-windows)
+by Nick Janetakis for Windows, Linux and macOS.
 
 #### After booting from the USB drive
 
@@ -474,7 +485,9 @@ Here's a [written and video tutorial](https://nickjanetakis.com/blog/create-boot
 
 #### Run `archinstall` from your shell
 
-If you prefer video, [here's a walkthrough](https://nickjanetakis.com/blog/walking-through-a-minimal-arch-linux-set-up-with-archinstall) by Nick Janetakis of what's listed below. Keep in mind the archinstall script changes over time.
+If you prefer video, [here's a
+walkthrough](https://nickjanetakis.com/blog/walking-through-a-minimal-arch-linux-set-up-with-archinstall)
+by Nick Janetakis of what's listed below. Keep in mind the archinstall script changes over time.
 The steps listed below will always have the latest updates. Even if the video
 gets slightly outdated because a menu item changed the general tips and
 concepts still apply!
@@ -570,7 +583,7 @@ in.
 At this point you have Arch installed and you can run the bootstrap script
 [mentioned earlier in this readme](#%EF%B8%8F-install) to install DotFriedRice!
 
-### How do I get started with the desktop environment?
+### How to get started with the desktop environment?
 
 After logging in you'll be greeted with an empty desktop and a top bar:
 
@@ -600,24 +613,122 @@ On a fresh boot, the total system memory used is about 1 GB. GPU memory will
 vary depending on which GPU vendor you use but it's only a few hundred megs
 with niri and Walker loaded.
 
-To put things into perspective my main desktop was built from parts in 2014. I
-have an i5-4460 quad core CPU at 3.4ghz with 16 GB of RAM and an SSD. I used a
-GeForce 750 Ti (2 GB) GPU for a long time and things were mostly ok. I
-eventually switched to an AMD RX 480 (8 GB) GPU because I noticed with 2 GB on
-an NVIDIA card I'd sometimes run out of VRAM while recording videos with a lot
-of things open.
+To put things into perspective, this setup is based on the work of
+[Nick Janetakis](https://github.com/nickjj) who ran it on a 2014-era desktop:
+an i5-4460 quad core CPU at 3.4ghz with 16 GB of RAM and an SSD. He used a
+GeForce 750 Ti (2 GB) GPU for a long time and things were mostly ok. He
+eventually switched to an AMD RX 480 (8 GB) GPU because with 2 GB on an NVIDIA
+card he'd sometimes run out of VRAM while recording videos with a lot of things
+open.
 
-Long story short, the system blazes. After switching from Windows 10 it felt
-like I got a hardware upgrade. This is thanks to the Linux kernel, Arch Linux,
-niri and generally people caring about performance!
+Long story short, the system blazes even on older hardware. This is thanks to
+the Linux kernel, Arch Linux, niri and generally people caring about performance!
 
-I spend all day working on this machine developing web apps, running Docker
-containers, Virtual Machines, recording and editing videos, a little gaming,
-etc.. I don't feel held back with performance, even with this 2014 era machine.
+### How to get set up on Windows to install WSL 2 and a distro?
+
+First, you'll likely want the official Microsoft Terminal. It's great for
+running WSL 2 as well as PowerShell and good old command. I used it for years.
+You can [download it from the Microsoft
+Store](https://apps.microsoft.com/detail/9n0dx20hk701).
+
+#### Confirm WSL 2 is installed and version 2 is the default
+
+Open PowerShell as an administrator and then run:
+
+```powershell
+# Install WSL 2 if it's not already installed, then reboot when Windows requests to.
+wsl --install
+
+# Update WSL 2 to the latest version if it's not already up to date.
+wsl --update
+
+# Check if WSL 2 is the default version, and set it to 2 if not.
+wsl --status
+wsl --set-default-version 2
+```
+
+#### Choose which distro to install
+
+I suggest Arch Linux but using Ubuntu or Debian will work too. I'll include
+instructions for Arch Linux below but give tips for Ubuntu / Debian along the
+way.
+
+Open PowerShell as an administrator and then run:
+
+```powershell
+# This will start downloading the official Arch Linux distro, when it completes
+# you'll be placed into a root prompt within Arch Linux running in WSL 2.
+wsl --install archlinux
+```
+
+*If you choose to install Ubuntu, the commands below aren't necessary as it
+will prompt you for a user to create along with a password and then set that as
+the default. After that you can skip to "Configuring Windows" below.*
+
+Let's configure a few things within Arch Linux. If you were to install native
+Arch Linux these steps would normally be done during the installation of Arch
+Linux through the bootable USB drive:
+
+```sh
+# Update system packages to their latest version and press "y" to confirm.
+pacman -Syu
+
+# Set your root user's password.
+passwd root
+
+# Create your main user, replace "sassd" with the user you want to create.
+useradd -m -G wheel sassd
+
+# Set your user's password, replace "sassd" with the user you created above.
+passwd sassd
+
+# Set your locale, for example here's how to set it for en_US.UTF-8. If you
+# want to use something else and you're not sure what to set you can run
+# cat /etc/locale.gen to look at what's available. Replace all (3) values below
+# before running these commands with your adjusted value as desired.
+sed -i "s/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/g" /etc/locale.gen
+echo "LANG=en_US.UTF-8" > /etc/locale.conf
+locale-gen
+
+# Configure Windows (registry) to login as this user by default, replace "sassd"
+# with the user you created above.
+wsl.exe --manage archlinux --set-default-user sassd
+```
+
+That takes care of configuring the Linux side of things. Moving forward you can
+launch the Microsoft Terminal and then pick Arch Linux (or Ubuntu, etc.) from
+the tab drop down box to launch it.
+
+#### Configuring Windows
+
+In addition to the above, there's a few Windows things to configure once.
+There's a few config files that I have in a few directories of this repo. These
+are in the [mnt/c/Users/sassd](./mnt/c/Users/sassd) directory.
+
+It is expected that you copy them over to your system while replacing "sassd"
+with your Windows user name if you want to use them. The Microsoft Terminal
+config will automatically be copied over to your user's path when you install
+DotFriedRice.
+
+Pay very close attention to the `mnt/c/Users/sassd/.wslconfig` file because it
+has values in there that you will very likely want to change before using it.
+[This commit
+message](https://github.com/nickjj/dotfriedrice/commit/d0f1fc2622204b809cf7fcbb1a82d45b451064c4)
+goes into the details.
+
+You may have noticed I don't enable systemd within WSL 2. That is on purpose.
+I've found it delays opening WSL 2 by ~10-15 seconds and also any systemd
+services were delayed from starting by ~2 minutes.
+
+At this point, you can [install DotFriedRice](#%EF%B8%8F-install) from inside
+your WSL 2 instance, have fun!
 
 ### Where is the original Vim config?
 
-DotFriedRice never had a dedicated Vim config, but Nick Janetakis wrote dozens of [blog posts and videos](https://nickjanetakis.com/blog/tag/vim-tips-tricks-and-tutorials) on Vim and tagged his repo at the point before switching to Neovim — see the [vim tag](https://github.com/nickjj/dotfriedrice/tree/vim) for `.vimrc`.
+DotFriedRice never had a dedicated Vim config, but Nick Janetakis wrote dozens of
+[blog posts and videos](https://nickjanetakis.com/blog/tag/vim-tips-tricks-and-tutorials)
+on Vim and tagged his repo at the point before switching to Neovim — see the
+[vim tag](https://github.com/nickjj/dotfriedrice/tree/vim) for `.vimrc`.
 
 ## 🤝 Feedback and Code Contributions
 
