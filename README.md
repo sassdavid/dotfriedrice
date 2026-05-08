@@ -290,8 +290,8 @@ Before you start customizing other files, please take a look at the
 
 #### Git identities
 
-If you work across multiple contexts (personal, work, clients) these dotfriedrice
-have a multi-identity git system that automatically switches your `user.name`
+If you work across multiple contexts (personal, work, clients) DotFriedRice
+has a multi-identity git system that automatically switches your `user.name`
 and `user.email` based on which directory you're working in.
 
 During the install the script will prompt you for a name and email per
@@ -725,19 +725,22 @@ your WSL 2 instance, have fun!
 
 ### Where is the original Vim config?
 
-DotFriedRice never had a dedicated Vim config, but Nick Janetakis wrote dozens of
-[blog posts and videos](https://nickjanetakis.com/blog/tag/vim-tips-tricks-and-tutorials)
-on Vim and tagged his repo at the point before switching to Neovim — see the
-[vim tag](https://github.com/nickjj/dotfriedrice/tree/vim) for `.vimrc`.
+This fork doesn't include a Vim config, but the upstream repo by Nick Janetakis
+has a [`vim` tag](https://github.com/nickjj/dotfriedrice/tree/vim) that captures
+the state of the repo before he switched to Neovim — you'll find `.vimrc` there.
+He also wrote dozens of [blog posts and videos](https://nickjanetakis.com/blog/tag/vim-tips-tricks-and-tutorials)
+on the topic if you want more context.
 
 ## 🤝 Feedback and Code Contributions
 
 You're more than welcome to offer suggestions and improvements!
 
 If you consider opening an issue, discussion or pull request please remember, I
-am 1 person doing this as a hobby. I maintain dozens of projects and would love
-to collaborate on anything related to this project but please don't blindly
-drop a bunch of agent generated slop onto this project.
+am 1 person doing this as a hobby, built on top of
+[Nick Janetakis's dotfriedrice](https://github.com/nickjj/dotfriedrice) and
+extended with things I personally needed — like automatic 1Password SSH agent
+integration in WSL 2, multi-identity git handling, and a few other quality of
+life tweaks.
 
 If you want to use AI or agents to help please do but there's an expectation
 that you understand the code you're submitting. We're dealing with Bash here,
