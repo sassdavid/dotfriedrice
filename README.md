@@ -8,8 +8,9 @@ In 1 command and ~5 minutes you can get a new or existing system set up with
 terminal based tools and workflows on Arch / Debian based Linux distros (WSL 2
 included) and macOS.
 
-If you're on an Arch based distro you can optionally set up a complete
-[niri](https://github.com/niri-wm/niri) based desktop environment.
+If you're on an Arch based distro you can optionally add a complete
+[niri](https://github.com/niri-wm/niri) based desktop environment in addition
+to having all of the command line tools.
 
 ### Philosophy
 
@@ -47,6 +48,7 @@ distro.*
 
 #### Highlights
 
+- ...includes everything in the command line version, plus:
 - niri *(Wayland compositor)*, Waybar *(status bar)*, Walker *(app launcher)* and friends
 - Hotkey focused but tons of mouse / trackpad support
 - Prefer TUI (Terminal User Interface) apps over GUI apps when possible
@@ -82,10 +84,6 @@ packages, standalone scripts, programming languages and more.
 
 - [Themes](#-themes)
 - [Quickly Get Set Up](#-quickly-get-set-up)
-  - [Make it your own](#-make-it-your-own)
-    - [Git identities](#git-identities)
-  - [Extra WSL 2 steps](#-extra-wsl-2-steps)
-    - [1Password SSH Agent Integration](#1password-ssh-agent-integration)
 - [FAQ](#-faq)
   - [How to personalize DotFriedRice?](#how-to-personalize-dot-fried-rice)
   - [How to theme custom apps?](#how-to-get-theme-custom-apps)
@@ -94,7 +92,6 @@ packages, standalone scripts, programming languages and more.
   - [How to get started with the desktop environment?](#how-to-get-started-with-the-desktop-environment)
   - [How much resources does the desktop environment use?](#how-much-resources-does-the-desktop-environment-use)
   - [How to get set up on Windows to install WSL 2 and a distro?](#how-to-get-set-up-on-windows-to-install-wsl-2-and-a-distro)
-  - [Where is the original Vim config?](#where-is-the-original-vim-config)
 - [Feedback and Code Contributions](#-feedback-and-code-contributions)
 - [About the Author](#-about-the-author)
 
@@ -467,7 +464,8 @@ setting up Arch but I wanted to include these steps to help get things cooking.
 
 #### Create a bootable USB drive
 
-Here's a [written and video tutorial](https://nickjanetakis.com/blog/create-bootable-arch-usb-on-linux-macos-with-cat-or-rufus-on-windows)
+Here's a [written and video
+tutorial](https://nickjanetakis.com/blog/create-bootable-arch-usb-on-linux-macos-with-cat-or-rufus-on-windows)
 by Nick Janetakis for Windows, Linux and macOS.
 
 #### After booting from the USB drive
@@ -601,7 +599,7 @@ After logging in you'll be greeted with an empty desktop and a top bar:
   - There's a sound icon in the top right to pick your input and output devices
   - Alternatively you can run `wiremix` from a terminal
   - Both `mpd` and [rmpc](https://github.com/mierak/rmpc) are installed for playing music, configure your music directory!
-- Open a terminal and run `dt` to switch to the DotFriedRice repo and open it in Neovim
+- Open a terminal and run `dfr` to switch to the DotFriedRice repo and open it in Neovim
   - Explore `.config/niri/config.kdl` for a complete list of key binds
 - Have fun with *your* new system!
 
@@ -611,7 +609,8 @@ Very little! DotFriedRice works great on high end and low end machines.
 
 On a fresh boot, the total system memory used is about 1 GB. GPU memory will
 vary depending on which GPU vendor you use but it's only a few hundred megs
-with niri and Walker loaded.
+with niri and Walker loaded. With everything installed and running it uses a
+touch over 10 GB of disk space.
 
 To put things into perspective, this setup is based on the work of
 [Nick Janetakis](https://github.com/nickjj) who ran it on a 2014-era desktop:
@@ -722,14 +721,6 @@ services were delayed from starting by ~2 minutes.
 
 At this point, you can [install DotFriedRice](#%EF%B8%8F-install) from inside
 your WSL 2 instance, have fun!
-
-### Where is the original Vim config?
-
-This fork doesn't include a Vim config, but the upstream repo by Nick Janetakis
-has a [`vim` tag](https://github.com/nickjj/dotfriedrice/tree/vim) that captures
-the state of the repo before he switched to Neovim — you'll find `.vimrc` there.
-He also wrote dozens of [blog posts and videos](https://nickjanetakis.com/blog/tag/vim-tips-tricks-and-tutorials)
-on the topic if you want more context.
 
 ## 🤝 Feedback and Code Contributions
 

@@ -280,6 +280,12 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     CONFIG_INSTALL_EXTRAS=()
   fi
 
+  if [[ "${CONFIG_INSTALL_SKIP+x}" ]]; then
+    [ -z "${CONFIG_INSTALL_SKIP}" ] && CONFIG_INSTALL_SKIP=()
+  else
+    CONFIG_INSTALL_SKIP=()
+  fi
+
   if [[ "${CONFIG_INSTALL_GUI_LINUX+x}" ]]; then
     [ -z "${CONFIG_INSTALL_GUI_LINUX}" ] && CONFIG_INSTALL_GUI_LINUX=()
   else
@@ -290,6 +296,12 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     [ -z "${CONFIG_INSTALL_GUI_LINUX_EXTRAS}" ] && CONFIG_INSTALL_GUI_LINUX_EXTRAS=()
   else
     CONFIG_INSTALL_GUI_LINUX_EXTRAS=()
+  fi
+
+  if [[ "${CONFIG_INSTALL_GUI_LINUX_SKIP+x}" ]]; then
+    [ -z "${CONFIG_INSTALL_GUI_LINUX_SKIP}" ] && CONFIG_INSTALL_GUI_LINUX_SKIP=()
+  else
+    CONFIG_INSTALL_GUI_LINUX_SKIP=()
   fi
 
   if [[ "${CONFIG_INSTALL_ARCH+x}" ]]; then
@@ -304,6 +316,12 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     CONFIG_INSTALL_ARCH_EXTRAS=()
   fi
 
+  if [[ "${CONFIG_INSTALL_ARCH_SKIP+x}" ]]; then
+    [ -z "${CONFIG_INSTALL_ARCH_SKIP}" ] && CONFIG_INSTALL_ARCH_SKIP=()
+  else
+    CONFIG_INSTALL_ARCH_SKIP=()
+  fi
+
   if [[ "${CONFIG_INSTALL_WSL+x}" ]]; then
     [ -z "${CONFIG_INSTALL_WSL}" ] && CONFIG_INSTALL_WSL=()
   else
@@ -314,6 +332,12 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     [ -z "${CONFIG_INSTALL_WSL_EXTRAS}" ] && CONFIG_INSTALL_WSL_EXTRAS=()
   else
     CONFIG_INSTALL_WSL_EXTRAS=()
+  fi
+
+  if [[ "${CONFIG_INSTALL_WSL_SKIP+x}" ]]; then
+    [ -z "${CONFIG_INSTALL_WSL_SKIP}" ] && CONFIG_INSTALL_WSL_SKIP=()
+  else
+    CONFIG_INSTALL_WSL_SKIP=()
   fi
 
   if [[ ! "${SUDOERS_ENTRIES+x}" ]]; then
@@ -680,6 +704,26 @@ _display_packages() {
     _package_display "Mise (default)" "${MISE_DARWIN[@]}"
     _package_display "Mise (extras)" "${MISE_DARWIN_EXTRAS[@]}"
   fi
+}
+
+_skip_install_configs() {
+  local -n install_configs_default="${1}"
+  local -n install_configs_skip="${2}"
+  local install_configs_filtered=()
+
+  declare -A install_configs_skip_map
+
+  for item in "${install_configs_skip[@]}"; do
+    install_configs_skip_map["${item}"]=1
+  done
+
+  for item in "${install_configs_default[@]}"; do
+    if [[ -z "${install_configs_skip_map[${item}]+x}" ]]; then
+      install_configs_filtered+=("${item}")
+    fi
+  done
+
+  install_configs_default=("${install_configs_filtered[@]}")
 }
 
 _config_install() {
@@ -1094,181 +1138,6 @@ detect_and_prepare_bluetooth() {
   fi
 }
 
-create_initial_dirs() {
-  mkdir -p \
-    "${HOME}/.local/bin" \
-    "${XDG_CACHE_HOME}/zsh" \
-    "${XDG_CONFIG_HOME}/bat/themes" \
-    "${XDG_CONFIG_HOME}/btop/themes" \
-    "${XDG_CONFIG_HOME}/fastfetch" \
-    "${XDG_CONFIG_HOME}/fzf" \
-    "${XDG_CONFIG_HOME}/ghostty" \
-    "${XDG_CONFIG_HOME}/git" \
-    "${XDG_CONFIG_HOME}/gnupg" \
-    "${XDG_CONFIG_HOME}/tmux/plugins" \
-    "${XDG_CONFIG_HOME}/zsh" \
-    "${XDG_DATA_HOME}/fonts" \
-    "${XDG_STATE_HOME}"
-
-  if [ "${GUI_ENABLED}" == "1" ]; then
-    mkdir -p \
-      "${XDG_CACHE_HOME}/mpd" \
-      "${XDG_CONFIG_HOME}/fontconfig" \
-      "${XDG_CONFIG_HOME}/gtk-3.0" \
-      "${XDG_CONFIG_HOME}/gtk-4.0" \
-      "${XDG_CONFIG_HOME}/hypr" \
-      "${XDG_CONFIG_HOME}/mako" \
-      "${XDG_CONFIG_HOME}/mpd" \
-      "${XDG_CONFIG_HOME}/niri" \
-      "${XDG_CONFIG_HOME}/rmpc" \
-      "${XDG_CONFIG_HOME}/satty" \
-      "${XDG_CONFIG_HOME}/swayidle" \
-      "${XDG_CONFIG_HOME}/swaylock" \
-      "${XDG_CONFIG_HOME}/tumbler" \
-      "${XDG_CONFIG_HOME}/uwsm" \
-      "${XDG_CONFIG_HOME}/walker/themes/base" \
-      "${XDG_CONFIG_HOME}/wallpaper" \
-      "${XDG_CONFIG_HOME}/waybar" \
-      "${XDG_CONFIG_HOME}/xarchiver" \
-      "${XDG_CONFIG_HOME}/zathura" \
-      "${XDG_DATA_HOME}/applications" \
-      "${XDG_DATA_HOME}/themes" \
-      "${XDG_DESKTOP_DIR}" \
-      "${XDG_DOCUMENTS_DIR}" \
-      "${XDG_DOWNLOAD_DIR}" \
-      "${XDG_MUSIC_DIR}/playlists" \
-      "${XDG_PICTURES_DIR}" \
-      "${XDG_PUBLICSHARE_DIR}" \
-      "${XDG_TEMPLATES_DIR}" \
-      "${XDG_VIDEOS_DIR}"
-  fi
-
-  mkdir -p \
-    "${XDG_CONFIG_HOME}/eza" \
-    "${XDG_CONFIG_HOME}/k9s/skins" \
-    "${XDG_DATA_HOME}/zsh/completions" \
-    "${HOME}/.aws" \
-    "${HOME}/.claude"
-
-  if [ -z "${GNUPGHOME:-}" ]; then
-    # bashsupport disable=BP2001
-    export GNUPGHOME="${XDG_CONFIG_HOME}/gnupg"
-  fi
-}
-
-install_packages() {
-  _info "INSTALL PACKAGES"
-
-  if [ "${SKIP_SYSTEM_PACKAGES}" == "1" ]; then
-    _skipping "You've chosen not to install packages"
-    return
-  fi
-
-  # Filter default packages before we do anything.
-  _skip_packages "PACKAGES_PACMAN" "PACKAGES_PACMAN_SKIP"
-  _skip_packages "PACKAGES_PACMAN_GUI" "PACKAGES_PACMAN_GUI_SKIP"
-  _skip_packages "PACKAGES_AUR" "PACKAGES_AUR_SKIP"
-  _skip_packages "PACKAGES_AUR_GUI" "PACKAGES_AUR_GUI_SKIP"
-  _skip_packages "PACKAGES_APT" "PACKAGES_APT_SKIP"
-  _skip_packages "PACKAGES_BREW" "PACKAGES_BREW_SKIP"
-  _skip_packages "PACKAGES_BREW_CASK" "PACKAGES_BREW_CASK_SKIP"
-  _skip_packages "MISE_ARCH" "MISE_ARCH_SKIP"
-  _skip_packages "MISE_DEBIAN" "MISE_DEBIAN_SKIP"
-  _skip_packages "MISE_DARWIN" "MISE_DARWIN_SKIP"
-
-  local first_run_msg=
-
-  # We'll only let users know this detail if auto confirm wasn't enabled.
-  if [[ "${DOTFRIEDRICE_FIRST_RUN}" == "1" && "${PACKAGES_AUTO_CONFIRM}" != "1" ]]; then
-    PACKAGES_AUTO_CONFIRM="1"
-    first_run_msg=$(
-      cat <<EOF
-
-PACKAGES_AUTO_CONFIRM was set to 1 because it looks like you're setting up
-DotFriedRice for the first time, this avoids you having to approve and
-agree many times. This won't happen automatically on future runs.
-
-EOF
-    )
-  fi
-
-  cat <<EOF
-$(_display_packages)
-
----
-
-${C_YELLOW}If you choose yes${C_RESET}, the above packages will be installed with or without
-confirmation by you based on if PACKAGES_AUTO_CONFIRM=${PACKAGES_AUTO_CONFIRM} is set to 1.
-${first_run_msg}
-${C_YELLOW}If you choose no${C_RESET}, the above packages will not be installed and this script
-will exit here. This gives you a chance to edit the list of packages.
-
-You can edit 'dotfriedrice-config' to modify the package list(s).
-
-You can find the default list of packages for your OS in:
-less ${DOTFRIEDRICE_PATH}/_install/default/packages/${OS_DISTRO}
-
-EOF
-
-  while true; do
-    read -rp "Do you want to install the above packages? (y/n) " yn
-    case "${yn}" in
-    [Yy]*)
-      if [ "${OS_TYPE}" == "linux" ]; then
-        if [ "${OS_DISTRO}" == "arch" ]; then
-          _install_packages_arch
-        elif [ "${OS_DISTRO}" == "debian" ]; then
-          _install_packages_debian
-        fi
-      else
-        _install_packages_macos
-      fi
-
-      break
-      ;;
-    [Nn]*) exit ;;
-    *) _error "Please answer y or n\n" "" ;;
-    esac
-  done
-}
-
-compare_install_config() {
-  _info "COMPARE INSTALL CONFIG"
-
-  example_file="dotfriedrice-config.example"
-  real_file="dotfriedrice-config"
-
-  if [ "${example_file}" -nt "${real_file}" ]; then
-    DELTA_PAGER="cat" git diff --no-index dotfriedrice-config dotfriedrice-config.example
-
-    cat <<EOF
-
----
-
-The above is a diff between your ${real_file} and the ${example_file}.
-Anything you see in green is in the updated ${example_file}.
-
-It's completely normal for you to see your custom changes here but the
-${example_file} file has a newer mtime (modified time) than your config
-which indicates it might have new updates for you to merge into your ${real_file}.
-
-This merge cannot be automated in a reasonable way so you'll want to eyeball it
-and copy over new lines, remove unused lines or update existing defaults.
-
-If you want to proceed anyways you can run: touch ${real_file}
-
-The above will update your config's mtime, but be warned this could allow the
-dotfriedrice script to run in unintended ways with missing configuration values.
-
-EOF
-
-    _error "There are potentially new updates to merge into your '${real_file}'"
-
-  else
-    _skipping "'${real_file}' is up to date"
-  fi
-}
-
 update_dotfriedrice() {
   _info "UPDATE DOTFRIEDRICE"
 
@@ -1334,6 +1203,380 @@ update_dotfriedrice() {
     # configuration was introduced which means reading in their env vars.
     exec "${0}" "${@}"
   fi
+}
+
+compare_install_config() {
+  _info "COMPARE INSTALL CONFIG"
+
+  example_file="dotfriedrice-config.example"
+  real_file="dotfriedrice-config"
+
+  if [ "${example_file}" -nt "${real_file}" ]; then
+    DELTA_PAGER="cat" git diff --no-index dotfriedrice-config dotfriedrice-config.example
+
+    cat <<EOF
+
+---
+
+The above is a diff between your ${real_file} and the ${example_file}.
+Anything you see in green is in the updated ${example_file}.
+
+It's completely normal for you to see your custom changes here but the
+${example_file} file has a newer mtime (modified time) than your config
+which indicates it might have new updates for you to merge into your ${real_file}.
+
+This merge cannot be automated in a reasonable way so you'll want to eyeball it
+and copy over new lines, remove unused lines or update existing defaults.
+
+If you want to proceed anyways you can run: touch ${real_file}
+
+The above will update your config's mtime, but be warned this could allow the
+dotfriedrice script to run in unintended ways with missing configuration values.
+
+EOF
+
+    _error "There are potentially new updates to merge into your '${real_file}'"
+
+  else
+    _skipping "'${real_file}' is up to date"
+  fi
+}
+
+create_initial_dirs() {
+  mkdir -p \
+    "${HOME}/.local/bin" \
+    "${XDG_CACHE_HOME}/zsh" \
+    "${XDG_CONFIG_HOME}/bat/themes" \
+    "${XDG_CONFIG_HOME}/btop/themes" \
+    "${XDG_CONFIG_HOME}/fastfetch" \
+    "${XDG_CONFIG_HOME}/fzf" \
+    "${XDG_CONFIG_HOME}/ghostty" \
+    "${XDG_CONFIG_HOME}/git" \
+    "${XDG_CONFIG_HOME}/gnupg" \
+    "${XDG_CONFIG_HOME}/tmux/plugins" \
+    "${XDG_CONFIG_HOME}/zsh" \
+    "${XDG_DATA_HOME}/fonts" \
+    "${XDG_STATE_HOME}"
+
+  if [ "${GUI_ENABLED}" == "1" ]; then
+    mkdir -p \
+      "${XDG_CACHE_HOME}/mpd" \
+      "${XDG_CONFIG_HOME}/fontconfig" \
+      "${XDG_CONFIG_HOME}/gtk-3.0" \
+      "${XDG_CONFIG_HOME}/gtk-4.0" \
+      "${XDG_CONFIG_HOME}/hypr" \
+      "${XDG_CONFIG_HOME}/mako" \
+      "${XDG_CONFIG_HOME}/mpd" \
+      "${XDG_CONFIG_HOME}/niri" \
+      "${XDG_CONFIG_HOME}/rmpc" \
+      "${XDG_CONFIG_HOME}/satty" \
+      "${XDG_CONFIG_HOME}/swayidle" \
+      "${XDG_CONFIG_HOME}/swaylock" \
+      "${XDG_CONFIG_HOME}/tumbler" \
+      "${XDG_CONFIG_HOME}/uwsm" \
+      "${XDG_CONFIG_HOME}/walker/themes/base" \
+      "${XDG_CONFIG_HOME}/wallpaper" \
+      "${XDG_CONFIG_HOME}/waybar" \
+      "${XDG_CONFIG_HOME}/xarchiver" \
+      "${XDG_CONFIG_HOME}/zathura" \
+      "${XDG_DATA_HOME}/applications" \
+      "${XDG_DATA_HOME}/themes" \
+      "${XDG_DESKTOP_DIR}" \
+      "${XDG_DOCUMENTS_DIR}" \
+      "${XDG_DOWNLOAD_DIR}" \
+      "${XDG_MUSIC_DIR}/playlists" \
+      "${XDG_PICTURES_DIR}" \
+      "${XDG_PUBLICSHARE_DIR}" \
+      "${XDG_TEMPLATES_DIR}" \
+      "${XDG_VIDEOS_DIR}"
+  fi
+
+  mkdir -p \
+    "${XDG_CONFIG_HOME}/eza" \
+    "${XDG_CONFIG_HOME}/k9s/skins" \
+    "${XDG_DATA_HOME}/zsh/completions" \
+    "${HOME}/.aws" \
+    "${HOME}/.claude"
+
+  if [ -z "${GNUPGHOME:-}" ]; then
+    # bashsupport disable=BP2001
+    export GNUPGHOME="${XDG_CONFIG_HOME}/gnupg"
+  fi
+}
+
+ask_for_name() {
+  _info "ASKING FOR YOUR NAME"
+
+  local config_file="${1}"
+  local name=
+
+  if [ -n "${YOUR_NAME}" ]; then
+    _skipping "'${YOUR_NAME}' was retrieved from your install config"
+    return 0
+  fi
+
+  if name="$(git config --file "${config_file}" user.name)"; then
+    _skipping "'${name}' was retrieved from your git config"
+  else
+    while true; do
+      printf "What is your full name (ie. Dade Murphy)? "
+      read -r name
+
+      if [[ ${name} =~ [^[:space:]]+ ]]; then
+        break
+      else
+        _error "Please enter at least your first name\n" ""
+      fi
+    done
+  fi
+
+  YOUR_NAME="${name}"
+}
+
+ask_for_email() {
+  _info "ASKING FOR YOUR EMAIL"
+
+  local config_file="${1}"
+  local email=
+
+  if [ -n "${YOUR_EMAIL}" ]; then
+    _skipping "'${YOUR_EMAIL}' was retrieved from your install config"
+    return 0
+  fi
+
+  if email="$(git config --file "${config_file}" user.email)"; then
+    _skipping "'${email}' was retrieved from your git config"
+  else
+    while true; do
+      printf "What is your email address (ie. zerocool@example.com)? "
+      read -r email
+
+      if [[ ${email} =~ .+@.+ ]]; then
+        break
+      else
+        _error "Please enter a valid email address\n" ""
+      fi
+    done
+  fi
+
+  YOUR_EMAIL="${email}"
+}
+
+install_packages() {
+  _info "INSTALL PACKAGES"
+
+  if [ "${SKIP_SYSTEM_PACKAGES}" == "1" ]; then
+    _skipping "You've chosen not to install packages"
+    return
+  fi
+
+  # Filter default packages before we do anything.
+  _skip_packages "PACKAGES_PACMAN" "PACKAGES_PACMAN_SKIP"
+  _skip_packages "PACKAGES_PACMAN_GUI" "PACKAGES_PACMAN_GUI_SKIP"
+  _skip_packages "PACKAGES_AUR" "PACKAGES_AUR_SKIP"
+  _skip_packages "PACKAGES_AUR_GUI" "PACKAGES_AUR_GUI_SKIP"
+  _skip_packages "PACKAGES_APT" "PACKAGES_APT_SKIP"
+  _skip_packages "PACKAGES_BREW" "PACKAGES_BREW_SKIP"
+  _skip_packages "PACKAGES_BREW_CASK" "PACKAGES_BREW_CASK_SKIP"
+  _skip_packages "MISE_ARCH" "MISE_ARCH_SKIP"
+  _skip_packages "MISE_DEBIAN" "MISE_DEBIAN_SKIP"
+  _skip_packages "MISE_DARWIN" "MISE_DARWIN_SKIP"
+
+  # On the first run, there will be a number of prompts to contend with, if
+  # someone wanted to customize the packages first, that was proposed during
+  # the bootstrap process. It's safe to skip confirmation here based on that.
+  [ "${DOTFRIEDRICE_FIRST_RUN}" == "1" ] && PACKAGES_AUTO_CONFIRM="1"
+
+  if [ "${PACKAGES_AUTO_CONFIRM}" != "1" ]; then
+    cat <<EOF
+$(_display_packages)
+
+---
+
+${C_YELLOW}If you choose yes${C_RESET}, the above packages will be installed with or without
+confirmation by you based on if PACKAGES_AUTO_CONFIRM=${PACKAGES_AUTO_CONFIRM} is set to 1.
+
+${C_YELLOW}If you choose no${C_RESET}, the above packages will not be installed and this script
+will exit here. This gives you a chance to edit the list of packages.
+
+You can edit 'dotfriedrice-config' to modify the package list(s).
+
+You can find the default list of packages for your OS in:
+less ${DOTFRIEDRICE_PATH}/_install/default/packages/${OS_DISTRO}
+
+EOF
+
+    while true; do
+      read -rp "Do you want to install the above packages? (y/n) " yn
+      case "${yn}" in
+      [Yy]*) break ;;
+      [Nn]*) exit ;;
+      *) _error "Please answer y or n\n" "" ;;
+      esac
+    done
+  fi
+
+  if [ "${OS_TYPE}" == "linux" ]; then
+    if [ "${OS_DISTRO}" == "arch" ]; then
+      _install_packages_arch
+    elif [ "${OS_DISTRO}" == "debian" ]; then
+      _install_packages_debian
+    fi
+  else
+    _install_packages_macos
+  fi
+}
+
+install_programming_languages() {
+  _info "INSTALL PROGRAMMING LANGUAGES"
+
+  declare -A mise_languages
+
+  # Merge both arrays.
+  for key in "${!MISE_LANGUAGES[@]}"; do
+    mise_languages["${key}"]="${MISE_LANGUAGES[${key}]}"
+  done
+  for key in "${!MISE_LANGUAGES_EXTRAS[@]}"; do
+    mise_languages["${key}"]="${MISE_LANGUAGES_EXTRAS[${key}]}"
+  done
+
+  if ((${#mise_languages[@]} == 0)); then
+    _skipping "No languages set"
+    return
+  fi
+
+  for key in "${!mise_languages[@]}"; do
+    [[ "${key}" = "0" || -z "${mise_languages[${key}]}" ]] && continue
+
+    local mise_shim_path="${XDG_DATA_HOME}/mise/shims"
+
+    printf "\n%bInstalling %b:%b\n\n" "${C_BLUE}" "${mise_languages["${key}"]}" "${C_RESET}"
+    if command -v "${mise_shim_path}/${key}" 1>/dev/null; then
+      _skipping "Already installed, run 'mise upgrade ${key} --bump' to upgrade"
+    else
+      mise use --global "${mise_languages[${key}]}"
+    fi
+  done
+
+  install_rust
+}
+
+install_configs() {
+  local auto_confirm="${1:-"${CONFIG_INSTALL_AUTO_CONFIRM}"}"
+
+  _info "INSTALL CONFIGS"
+
+  local warning_count=0
+
+  local config_install=()
+  local config_install_gui_linux=()
+  local config_install_arch=()
+  local config_install_wsl=()
+
+  _skip_install_configs "CONFIG_INSTALL" "CONFIG_INSTALL_SKIP"
+  _skip_install_configs "CONFIG_INSTALL_GUI_LINUX" "CONFIG_INSTALL_GUI_LINUX_SKIP"
+  _skip_install_configs "CONFIG_INSTALL_ARCH" "CONFIG_INSTALL_ARCH_SKIP"
+  _skip_install_configs "CONFIG_INSTALL_WSL" "CONFIG_INSTALL_WSL_SKIP"
+
+  ((${#CONFIG_INSTALL[@]} > 0)) && config_install+=("${CONFIG_INSTALL[@]}")
+  ((${#CONFIG_INSTALL_EXTRAS[@]} > 0)) && config_install+=("${CONFIG_INSTALL_EXTRAS[@]}")
+
+  ((${#CONFIG_INSTALL_GUI_LINUX[@]} > 0)) && config_install_gui_linux+=("${CONFIG_INSTALL_GUI_LINUX[@]}")
+  ((${#CONFIG_INSTALL_GUI_LINUX_EXTRAS[@]} > 0)) && config_install_gui_linux+=("${CONFIG_INSTALL_GUI_LINUX_EXTRAS[@]}")
+
+  ((${#CONFIG_INSTALL_ARCH[@]} > 0)) && config_install_arch+=("${CONFIG_INSTALL_ARCH[@]}")
+  ((${#CONFIG_INSTALL_ARCH_EXTRAS[@]} > 0)) && config_install_arch+=("${CONFIG_INSTALL_ARCH_EXTRAS[@]}")
+
+  ((${#CONFIG_INSTALL_WSL[@]} > 0)) && config_install_wsl+=("${CONFIG_INSTALL_WSL[@]}")
+  ((${#CONFIG_INSTALL_WSL_EXTRAS[@]} > 0)) && config_install_wsl+=("${CONFIG_INSTALL_WSL_EXTRAS[@]}")
+
+  _config_install_display "Configs" "${config_install[@]}"
+
+  if [ "${GUI_ENABLED}" == "1" ]; then
+    sudo mkdir -p "/etc/systemd/system/systemd-networkd-wait-online.service.d"
+    _config_install_display "Configs (GUI)" "${config_install_gui_linux[@]}"
+  fi
+
+  if [ "${OS_IN_WSL}" == "1" ]; then
+    local windows_user=
+    windows_user="$(_windows_username 2>/dev/null || true)"
+
+    _config_install_display "Configs (WSL)" "%WindowsUser" "${windows_user}" "${config_install_wsl[@]}"
+  fi
+
+  if [ "${OS_DISTRO}" == "arch" ]; then
+    # It's a bit more complicated to extract this into a variable since it has
+    # a condition with a fallback. For now let's keep it hard coded until a
+    # better pattern arrises to handle this in a dynamic way.
+    if [ -f "etc/pacman.d/02-ignore.conf" ]; then
+      config_install_arch+=("sudo ln -fns \"${DOTFRIEDRICE_PATH}/etc/pacman.d/02-ignore.conf\" \"/etc/pacman.d/02-ignore.conf\"")
+    else
+      sudo rm -f "/etc/pacman.d/02-ignore.conf"
+    fi
+
+    _config_install_display "Configs (Arch)" "${config_install_arch[@]}"
+  fi
+
+  # Nested helper function.
+  _activate_configs() {
+    # Avoid using ln -T flag since it doesn't exist on macOS. We're being
+    # extra careful here to only delete symlinks if they exist. Technically
+    # rm -f would work but that could delete real files potentially.
+    [ -L "${XDG_CONFIG_HOME}/nvim" ] && rm "${XDG_CONFIG_HOME}/nvim"
+
+    _config_install "${config_install[@]}"
+
+    [ "${GUI_ENABLED}" == "1" ] && _config_install "${config_install_gui_linux[@]}"
+    [ "${OS_IN_WSL}" == "1" ] && _config_install "%WindowsUser" "${windows_user}" "${config_install_wsl[@]}"
+    [ "${OS_DISTRO}" == "arch" ] && _config_install "${config_install_arch[@]}"
+
+    return 0
+  }
+
+  if [ "${auto_confirm}" == "1" ]; then
+    _activate_configs
+    return
+  fi
+
+  if ((warning_count > 0)); then
+    cat <<EOF
+
+---
+
+${C_MAGENTA}A destructive action is about to happen. Any warnings you see above indicate
+you have a file not managed by DotFriedRice at that path and now DotFriedRice
+wants to overwrite it.${C_RESET}
+
+${C_YELLOW}What would you like to do next?
+
+1) Overwrite all files listed above (you will lose them unless you back them up!)
+2) Skip overwriting anything and this script will exit so you can assess the situation${C_RESET}
+
+You can manually back these files up now while this prompt is running and
+then choose to overwrite them with option 1.
+${C_WHITE}
+If you're on a fresh system with no terminal yet you can press Ctrl+Alt+F2 to
+use tty2 to review them if desired and then jump back to this script by pressing
+Ctrl+Alt+F1. If you're on a laptop you might need to also hold down Fn.${C_RESET}
+EOF
+
+    while true; do
+      printf "\nWhich option number would you like to pick? "
+      read -r option
+
+      case "${option}" in
+      1)
+        break
+        ;;
+      2)
+        exit
+        ;;
+      *) _error "'${option}' isn't a valid choice, pick 1 or 2" "" ;;
+      esac
+    done
+  fi
+
+  _activate_configs
 }
 
 install_fonts() {
@@ -1484,119 +1727,6 @@ install_external_scripts() {
   done
 
   printf "\nInstalled to '%s'\n" "${HOME}/.local/bin/"
-}
-
-install_configs() {
-  local auto_confirm="${1:-"${CONFIG_INSTALL_AUTO_CONFIRM}"}"
-
-  _info "INSTALL CONFIGS"
-
-  local warning_count=0
-
-  local config_install=()
-  local config_install_gui_linux=()
-  local config_install_wsl=()
-  local config_install_arch=()
-
-  ((${#CONFIG_INSTALL[@]} > 0)) && config_install+=("${CONFIG_INSTALL[@]}")
-  ((${#CONFIG_INSTALL_EXTRAS[@]} > 0)) && config_install+=("${CONFIG_INSTALL_EXTRAS[@]}")
-
-  ((${#CONFIG_INSTALL_GUI_LINUX[@]} > 0)) && config_install_gui_linux+=("${CONFIG_INSTALL_GUI_LINUX[@]}")
-  ((${#CONFIG_INSTALL_GUI_LINUX_EXTRAS[@]} > 0)) && config_install_gui_linux+=("${CONFIG_INSTALL_GUI_LINUX_EXTRAS[@]}")
-
-  ((${#CONFIG_INSTALL_WSL[@]} > 0)) && config_install_wsl+=("${CONFIG_INSTALL_WSL[@]}")
-  ((${#CONFIG_INSTALL_WSL_EXTRAS[@]} > 0)) && config_install_wsl+=("${CONFIG_INSTALL_WSL_EXTRAS[@]}")
-
-  ((${#CONFIG_INSTALL_ARCH[@]} > 0)) && config_install_arch+=("${CONFIG_INSTALL_ARCH[@]}")
-  ((${#CONFIG_INSTALL_ARCH_EXTRAS[@]} > 0)) && config_install_arch+=("${CONFIG_INSTALL_ARCH_EXTRAS[@]}")
-
-  _config_install_display "Configs" "${config_install[@]}"
-
-  if [ "${GUI_ENABLED}" == "1" ]; then
-    sudo mkdir -p "/etc/systemd/system/systemd-networkd-wait-online.service.d"
-    _config_install_display "Configs (GUI)" "${config_install_gui_linux[@]}"
-  fi
-
-  if [ "${OS_IN_WSL}" == "1" ]; then
-    local windows_user=
-    windows_user="$(_windows_username 2>/dev/null || true)"
-
-    _config_install_display "Configs (WSL)" "%WindowsUser" "${windows_user}" "${config_install_wsl[@]}"
-  fi
-
-  if [ "${OS_DISTRO}" == "arch" ]; then
-    # It's a bit more complicated to extract this into a variable since it has
-    # a condition with a fallback. For now let's keep it hard coded until a
-    # better pattern arrises to handle this in a dynamic way.
-    if [ -f "etc/pacman.d/02-ignore.conf" ]; then
-      config_install_arch+=("sudo ln -fns \"${DOTFRIEDRICE_PATH}/etc/pacman.d/02-ignore.conf\" \"/etc/pacman.d/02-ignore.conf\"")
-    else
-      sudo rm -f "/etc/pacman.d/02-ignore.conf"
-    fi
-
-    _config_install_display "Configs (Arch)" "${config_install_arch[@]}"
-  fi
-
-  # Nested helper function.
-  _activate_configs() {
-    # Avoid using ln -T flag since it doesn't exist on macOS. We're being
-    # extra careful here to only delete symlinks if they exist. Technically
-    # rm -f would work but that could delete real files potentially.
-    [ -L "${XDG_CONFIG_HOME}/nvim" ] && rm "${XDG_CONFIG_HOME}/nvim"
-
-    _config_install "${config_install[@]}"
-
-    [ "${GUI_ENABLED}" == "1" ] && _config_install "${config_install_gui_linux[@]}"
-    [ "${OS_IN_WSL}" == "1" ] && _config_install "%WindowsUser" "${windows_user}" "${config_install_wsl[@]}"
-    [ "${OS_DISTRO}" == "arch" ] && _config_install "${config_install_arch[@]}"
-
-    return 0
-  }
-
-  if [ "${auto_confirm}" == "1" ]; then
-    _activate_configs
-    return
-  fi
-
-  if ((warning_count > 0)); then
-    cat <<EOF
-
----
-
-${C_MAGENTA}A destructive action is about to happen. Any warnings you see above indicate
-you have a file not managed by DotFriedRice at that path and now DotFriedRice
-wants to overwrite it.${C_RESET}
-
-${C_YELLOW}What would you like to do next?
-
-1) Overwrite all files listed above (you will lose them unless you back them up!)
-2) Skip overwriting anything and this script will exit so you can assess the situation${C_RESET}
-
-You can manually back these files up now while this prompt is running and
-then choose to overwrite them with option 1.
-${C_WHITE}
-If you're on a fresh system with no terminal yet you can press Ctrl+Alt+F2 to
-use tty2 and then jump back to this script by pressing Ctrl+Alt+F1. If you're on
-a laptop you might need to also hold down Fn.${C_RESET}
-EOF
-
-    while true; do
-      printf "\nWhich option number would you like to pick? "
-      read -r option
-
-      case "${option}" in
-      1)
-        break
-        ;;
-      2)
-        exit
-        ;;
-      *) _error "'${option}' isn't a valid choice, pick 1 or 2" "" ;;
-      esac
-    done
-  fi
-
-  _activate_configs
 }
 
 configure_sudoers_entries() {
@@ -1865,226 +1995,6 @@ EOF
   echo "Configured in '${xdg_local_path}'"
 }
 
-configure_shell() {
-  _info "CONFIGURE SHELL (ZSH)"
-
-  local local_files=(".zshrc.local" ".zprofile.local" ".aliases.local")
-  local original_dotfriedrice_path="${DOTFRIEDRICE_PATH}"
-
-  for file in "${local_files[@]}"; do
-    local file_path="${XDG_CONFIG_HOME}/zsh/${file}"
-
-    if [ ! -f "${file_path}" ]; then
-      printf "# shellcheck shell=bash\n# Add your custom overrides and new additions here.\n" >"${file_path}"
-    fi
-  done
-
-  local zprofile_path="${DOTFRIEDRICE_PATH}/.config/zsh/.zprofile.local"
-  local aliases_path="${DOTFRIEDRICE_PATH}/.config/zsh/.aliases.local"
-
-  if ! grep -q "^export DOTFRIEDRICE_PATH=.*$" "${zprofile_path}" 2>/dev/null; then
-    printf '\nexport DOTFRIEDRICE_PATH="%s"\n' "${DOTFRIEDRICE_PATH}" >>"${zprofile_path}"
-  fi
-
-  if [ "${OS_TYPE}" == "darwin" ]; then
-    if ! grep -q "HOMEBREW_NO_ANALYTICS" "${zprofile_path}" 2>/dev/null; then
-      printf '\nexport HOMEBREW_NO_ANALYTICS="1"\n' >>"${zprofile_path}"
-    fi
-
-    if ! grep -q "eval.*homebrew.*shellenv" "${zprofile_path}" 2>/dev/null; then
-      # shellcheck disable=SC2178
-      local prefix="/opt/homebrew"
-      # shellcheck disable=SC2178
-      [[ "${CPU_ARCH}" == "x86_64" ]] && prefix="/usr/local"
-
-      # shellcheck disable=SC2016,SC2128
-      printf "\neval \"\$(%s/bin/brew shellenv)\"\n" "${prefix}" >>"${zprofile_path}"
-    fi
-
-    if ! grep -q '^alias grep="grep -G"' "${aliases_path}" 2>/dev/null; then
-      cat <<EOF >>"${aliases_path}"
-
-alias grep="grep -G"
-alias fgrep="fgrep -G"
-alias egrep="egrep -G"
-EOF
-    fi
-  else
-    if ! grep -q 'alias grep="grep --color=auto"' "${aliases_path}" 2>/dev/null; then
-      cat <<EOF >>"${aliases_path}"
-
-alias grep="grep --color=auto"
-alias fgrep="fgrep --color=auto"
-alias egrep="egrep --color=auto"
-EOF
-    fi
-
-    # Is a Linux GUI supported?
-    if [ "${GUI_ENABLED}" == "1" ]; then
-      if ! grep -q "^if uwsm check may-start.*$" "${zprofile_path}" 2>/dev/null; then
-        printf "\n# Start niri after logging in.\nif uwsm check may-start; then exec uwsm start -- niri.desktop; fi\n" >>"${zprofile_path}"
-      fi
-    # Are we in WSL 2?
-    elif [ "${OS_IN_WSL}" == "1" ]; then
-      # This only applies if you have Docker installed without Docker Desktop
-      # and you're not using systemd.
-      if command -v docker >/dev/null 2>&1; then
-        if [ ! -d "${HOME}/.docker/desktop" ]; then
-          if [ ! -d /run/systemd/system ]; then
-            if ! grep -q "^if service docker status.*$" "${zprofile_path}" 2>/dev/null; then
-              local docker=
-              # shellcheck disable=SC2034
-              docker=$(
-                cat <<'EOF'
-# Ensure Docker is running on WSL 2 — install Docker in WSL 2 without Docker Desktop per
-# [Nick Janetakis's guide](https://nickjanetakis.com/blog/install-docker-in-wsl-2-without-docker-desktop).
-# Docker Compose directly within your WSL distro instead of Docker Desktop, such as:
-#   - https://nickjanetakis.com/blog/install-docker-in-wsl-2-without-docker-desktop
-if service docker status 2>&1 | grep -q "is not running"; then
-wsl.exe --distribution "${WSL_DISTRO_NAME}" --user root \
-  --exec /usr/sbin/service docker start >/dev/null 2>&1
-fi
-EOF
-              )
-
-              # printf "\n\n%s" "${docker}" >>"${zprofile_path}"
-            fi
-          fi
-        fi
-      fi
-
-      if ! grep -q '^alias drop_cache=' "${aliases_path}" 2>/dev/null; then
-        cat <<EOF >>"${aliases_path}"
-
-# This is specific to WSL 2. If the WSL 2 VM goes rogue and decides not to free
-# up memory, this command will free your memory after about 20-30 seconds.
-#   Details: https://github.com/microsoft/WSL/issues/4166#issuecomment-628493643
-alias drop_cache="sudo sh -c \"echo 3 >'/proc/sys/vm/drop_caches' && swapoff -a && swapon -a && printf '\n%s\n' 'Ram-cache and Swap Cleared'\""
-EOF
-      fi
-
-      if ! grep -q '^alias open="/mnt/c/Program' "${aliases_path}" 2>/dev/null; then
-        cat <<EOF >>"${aliases_path}"
-
-alias open="/mnt/c/Program\ Files\ \(x86\)/Google/Chrome/Application/chrome.exe"
-alias wopen="/mnt/c/Windows/System32/cmd.exe /C start 2> /dev/null"
-EOF
-      fi
-
-      # Configure Windows OpenSSH only if 1Password is installed on Windows.
-      local win_ssh_dir=
-      local win_ssh_dir_esc=
-
-      if _windows_has_1password; then
-        win_ssh_dir="$(_windows_openssh_dir 2>/dev/null || true)"
-        if [ -n "${win_ssh_dir}" ]; then
-          win_ssh_dir_esc="$(_escape_path_spaces "${win_ssh_dir}")"
-
-          if ! grep -q "^export GIT_SSH=.*$" "${zprofile_path}" 2>/dev/null; then
-            cat <<EOF >>"${zprofile_path}"
-
-# Configure Windows OpenSSH so the 1Password SSH agent is usable.
-export GIT_SSH="${win_ssh_dir_esc}/ssh.exe"
-export GIT_SSH_COMMAND="${win_ssh_dir_esc}/ssh.exe"
-EOF
-          fi
-
-          if ! grep -q "^alias ssh=.*$" "${aliases_path}" 2>/dev/null; then
-            cat <<EOF >>"${aliases_path}"
-
-# Configure Windows OpenSSH so the 1Password SSH agent is usable.
-alias ssh="${win_ssh_dir_esc}/ssh.exe"
-alias ssh-add="${win_ssh_dir_esc}/ssh-add.exe"
-alias scp="${win_ssh_dir_esc}/scp.exe"
-
-alias ssh2="/usr/bin/ssh"
-EOF
-          fi
-        fi
-      fi
-    fi
-  fi
-
-  # Switch to zsh in a way that supports our supported OS and distros.
-  local shell_path=
-  shell_path="$(which zsh)"
-
-  if ! grep -q "${shell_path}" /etc/shells; then
-    echo "${shell_path}" | sudo tee -a /etc/shells 1>/dev/null
-  fi
-
-  [ "${SHELL: -3}" != "zsh" ] && chsh -s "${shell_path}"
-
-  # shellcheck disable=SC1091
-  . "${XDG_CONFIG_HOME}/zsh/.zprofile" 1>/dev/null
-
-  # Given the above line sets this env var if it's defined, this ensures we
-  # always use the value that was set when running this script. This is mainly
-  # to make testing this script easier in Docker since the .local files are
-  # volume mounted and this value will be different in Docker.
-  DOTFRIEDRICE_PATH="${original_dotfriedrice_path}"
-
-  echo "Configured in '${DOTFRIEDRICE_PATH}/.config/zsh/'"
-}
-
-ask_for_name() {
-  _info "ASKING FOR YOUR NAME"
-
-  local config_file="${1}"
-  local name=
-
-  if [ -n "${YOUR_NAME}" ]; then
-    _skipping "'${YOUR_NAME}' was retrieved from your install config"
-    return 0
-  fi
-
-  if name="$(git config --file "${config_file}" user.name)"; then
-    _skipping "'${name}' was retrieved from your git config"
-  else
-    while true; do
-      printf "What is your full name (ie. Dade Murphy)? "
-      read -r name
-
-      if [[ ${name} =~ [^[:space:]]+ ]]; then
-        break
-      else
-        _error "Please enter at least your first name\n" ""
-      fi
-    done
-  fi
-
-  YOUR_NAME="${name}"
-}
-
-ask_for_email() {
-  _info "ASKING FOR YOUR EMAIL"
-
-  local config_file="${1}"
-  local email=
-
-  if [ -n "${YOUR_EMAIL}" ]; then
-    _skipping "'${YOUR_EMAIL}' was retrieved from your install config"
-    return 0
-  fi
-
-  if email="$(git config --file "${config_file}" user.email)"; then
-    _skipping "'${email}' was retrieved from your git config"
-  else
-    while true; do
-      printf "What is your email address (ie. zerocool@example.com)? "
-      read -r email
-
-      if [[ ${email} =~ .+@.+ ]]; then
-        break
-      else
-        _error "Please enter a valid email address\n" ""
-      fi
-    done
-  fi
-
-  YOUR_EMAIL="${email}"
-}
-
 configure_git() {
   _info "CONFIGURE GIT"
 
@@ -2234,6 +2144,168 @@ EOF
   printf "\nConfigured '%s'\n" "${XDG_CONFIG_HOME}/gitalias/gitalias.txt"
 }
 
+configure_shell() {
+  _info "CONFIGURE SHELL (ZSH)"
+
+  local local_files=(".zshrc.local" ".zprofile.local" ".aliases.local")
+  local original_dotfriedrice_path="${DOTFRIEDRICE_PATH}"
+
+  for file in "${local_files[@]}"; do
+    local file_path="${XDG_CONFIG_HOME}/zsh/${file}"
+
+    if [ ! -f "${file_path}" ]; then
+      printf "# shellcheck shell=bash\n# Add your custom overrides and new additions here.\n" >"${file_path}"
+    fi
+  done
+
+  local zprofile_path="${DOTFRIEDRICE_PATH}/.config/zsh/.zprofile.local"
+  local aliases_path="${DOTFRIEDRICE_PATH}/.config/zsh/.aliases.local"
+
+  if ! grep -q "^export DOTFRIEDRICE_PATH=.*$" "${zprofile_path}" 2>/dev/null; then
+    printf '\nexport DOTFRIEDRICE_PATH="%s"\n' "${DOTFRIEDRICE_PATH}" >>"${zprofile_path}"
+  fi
+
+  if [ "${OS_TYPE}" == "darwin" ]; then
+    if ! grep -q "HOMEBREW_NO_ANALYTICS" "${zprofile_path}" 2>/dev/null; then
+      printf '\nexport HOMEBREW_NO_ANALYTICS="1"\n' >>"${zprofile_path}"
+    fi
+
+    if ! grep -q "eval.*homebrew.*shellenv" "${zprofile_path}" 2>/dev/null; then
+      # shellcheck disable=SC2178
+      local prefix="/opt/homebrew"
+      # shellcheck disable=SC2178
+      [[ "${CPU_ARCH}" == "x86_64" ]] && prefix="/usr/local"
+
+      # shellcheck disable=SC2016,SC2128
+      printf "\neval \"\$(%s/bin/brew shellenv)\"\n" "${prefix}" >>"${zprofile_path}"
+    fi
+
+    if ! grep -q '^alias grep="grep -G"' "${aliases_path}" 2>/dev/null; then
+      cat <<EOF >>"${aliases_path}"
+
+alias grep="grep -G"
+alias fgrep="fgrep -G"
+alias egrep="egrep -G"
+EOF
+    fi
+  else
+    if ! grep -q 'alias grep="grep --color=auto"' "${aliases_path}" 2>/dev/null; then
+      cat <<EOF >>"${aliases_path}"
+
+alias grep="grep --color=auto"
+alias fgrep="fgrep --color=auto"
+alias egrep="egrep --color=auto"
+EOF
+    fi
+
+    # Is a Linux GUI supported?
+    if [ "${GUI_ENABLED}" == "1" ]; then
+      if ! grep -q "^if uwsm check may-start.*$" "${zprofile_path}" 2>/dev/null; then
+        printf "\n# Start niri after logging in.\nif uwsm check may-start; then exec uwsm start -- niri.desktop; fi\n" >>"${zprofile_path}"
+      fi
+    # Are we in WSL 2?
+    elif [ "${OS_IN_WSL}" == "1" ]; then
+      # This only applies if you have Docker installed without Docker Desktop
+      # and you're not using systemd.
+      if command -v docker >/dev/null 2>&1; then
+        if [ ! -d "${HOME}/.docker/desktop" ]; then
+          if [ ! -d /run/systemd/system ]; then
+            if ! grep -q "^if service docker status.*$" "${zprofile_path}" 2>/dev/null; then
+              local docker=
+              # shellcheck disable=SC2034
+              docker=$(
+                cat <<'EOF'
+# Ensure Docker is running on WSL 2 — install Docker in WSL 2 without Docker Desktop per
+# [Nick Janetakis's guide](https://nickjanetakis.com/blog/install-docker-in-wsl-2-without-docker-desktop).
+# Docker Compose directly within your WSL distro instead of Docker Desktop, such as:
+#   - https://nickjanetakis.com/blog/install-docker-in-wsl-2-without-docker-desktop
+if service docker status 2>&1 | grep -q "is not running"; then
+wsl.exe --distribution "${WSL_DISTRO_NAME}" --user root \
+  --exec /usr/sbin/service docker start >/dev/null 2>&1
+fi
+EOF
+              )
+
+              # printf "\n\n%s" "${docker}" >>"${zprofile_path}"
+            fi
+          fi
+        fi
+      fi
+
+      if ! grep -q '^alias drop_cache=' "${aliases_path}" 2>/dev/null; then
+        cat <<EOF >>"${aliases_path}"
+
+# This is specific to WSL 2. If the WSL 2 VM goes rogue and decides not to free
+# up memory, this command will free your memory after about 20-30 seconds.
+#   Details: https://github.com/microsoft/WSL/issues/4166#issuecomment-628493643
+alias drop_cache="sudo sh -c \"echo 3 >'/proc/sys/vm/drop_caches' && swapoff -a && swapon -a && printf '\n%s\n' 'Ram-cache and Swap Cleared'\""
+EOF
+      fi
+
+      if ! grep -q '^alias open="/mnt/c/Program' "${aliases_path}" 2>/dev/null; then
+        cat <<EOF >>"${aliases_path}"
+
+alias open="/mnt/c/Program\ Files\ \(x86\)/Google/Chrome/Application/chrome.exe"
+alias wopen="cmd.exe /C start 2> /dev/null"
+EOF
+      fi
+
+      # Configure Windows OpenSSH only if 1Password is installed on Windows.
+      local win_ssh_dir=
+      local win_ssh_dir_esc=
+
+      if _windows_has_1password; then
+        win_ssh_dir="$(_windows_openssh_dir 2>/dev/null || true)"
+        if [ -n "${win_ssh_dir}" ]; then
+          win_ssh_dir_esc="$(_escape_path_spaces "${win_ssh_dir}")"
+
+          if ! grep -q "^export GIT_SSH=.*$" "${zprofile_path}" 2>/dev/null; then
+            cat <<EOF >>"${zprofile_path}"
+
+# Configure Windows OpenSSH so the 1Password SSH agent is usable.
+export GIT_SSH="${win_ssh_dir_esc}/ssh.exe"
+export GIT_SSH_COMMAND="${win_ssh_dir_esc}/ssh.exe"
+EOF
+          fi
+
+          if ! grep -q "^alias ssh=.*$" "${aliases_path}" 2>/dev/null; then
+            cat <<EOF >>"${aliases_path}"
+
+# Configure Windows OpenSSH so the 1Password SSH agent is usable.
+alias ssh="${win_ssh_dir_esc}/ssh.exe"
+alias ssh-add="${win_ssh_dir_esc}/ssh-add.exe"
+alias scp="${win_ssh_dir_esc}/scp.exe"
+
+alias ssh2="/usr/bin/ssh"
+EOF
+          fi
+        fi
+      fi
+    fi
+  fi
+
+  # Switch to zsh in a way that supports our supported OS and distros.
+  local shell_path=
+  shell_path="$(which zsh)"
+
+  if ! grep -q "${shell_path}" /etc/shells; then
+    echo "${shell_path}" | sudo tee -a /etc/shells 1>/dev/null
+  fi
+
+  [ "${SHELL: -3}" != "zsh" ] && chsh -s "${shell_path}"
+
+  # shellcheck disable=SC1091
+  . "${XDG_CONFIG_HOME}/zsh/.zprofile" 1>/dev/null
+
+  # Given the above line sets this env var if it's defined, this ensures we
+  # always use the value that was set when running this script. This is mainly
+  # to make testing this script easier in Docker since the .local files are
+  # volume mounted and this value will be different in Docker.
+  DOTFRIEDRICE_PATH="${original_dotfriedrice_path}"
+
+  echo "Configured in '${DOTFRIEDRICE_PATH}/.config/zsh/'"
+}
+
 install_rust() {
   # bashsupport disable=BP2001
   export RUST_LANG_HOME="${RUST_LANG_HOME:-"${HOME}/rust-lang"}"
@@ -2261,38 +2333,6 @@ install_rust() {
 
   "${rustup_bin}" completions zsh >"${XDG_DATA_HOME}/zsh/completions/_rustup"
   "${rustup_bin}" completions zsh cargo >"${XDG_DATA_HOME}/zsh/completions/_cargo"
-}
-
-install_programming_languages() {
-  _info "INSTALL PROGRAMMING LANGUAGES"
-
-  declare -A mise_languages
-
-  # Merge both arrays.
-  for key in "${!MISE_LANGUAGES[@]}"; do
-    mise_languages["${key}"]="${MISE_LANGUAGES[${key}]}"
-  done
-  for key in "${!MISE_LANGUAGES_EXTRAS[@]}"; do
-    mise_languages["${key}"]="${MISE_LANGUAGES_EXTRAS[${key}]}"
-  done
-
-  if ((${#mise_languages[@]} == 0)); then
-    _skipping "No languages set"
-    return
-  fi
-
-  for key in "${!mise_languages[@]}"; do
-    [[ "${key}" = "0" || -z "${mise_languages[${key}]}" ]] && continue
-
-    printf "\n%bInstalling %b:%b\n\n" "${C_BLUE}" "${mise_languages["${key}"]}" "${C_RESET}"
-    if command -v "${XDG_DATA_HOME}/mise/shims/${key}" 1>/dev/null; then
-      _skipping "Already installed, run 'mise upgrade ${key} --bump' to upgrade"
-    else
-      mise use --global "${mise_languages[${key}]}"
-    fi
-  done
-
-  install_rust
 }
 
 install_tmux_plugins() {
@@ -2802,22 +2842,22 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   create_initial_dirs
   install_mise
   install_packages
+  install_programming_languages
   install_mongodb_tools
+  install_configs
   install_fonts
   install_gui_themes
   install_zsh_plugins
   install_external_scripts
-  install_configs
   configure_sudoers_entries
   configure_udev_rules
   configure_systemd_services
   configure_system_configs
   configure_home_configs
   configure_xdg_directories
-  configure_shell
   configure_git
+  configure_shell
   configure_tools
-  install_programming_languages
   install_tmux_plugins
   set_theme "${@}"
   healthcheck

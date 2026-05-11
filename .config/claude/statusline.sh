@@ -92,7 +92,7 @@ BAR=""
 [ "$EMPTY" -gt 0 ] && BAR="${BAR}$(printf "%${EMPTY}s" | tr ' ' '░')"
 
 if [ "$CONTEXT_SIZE" -ge 900000 ]; then
-  CTX_LABEL="1M"
+  CTX_LABEL="1m"
 else
   CTX_LABEL="200k"
 fi
