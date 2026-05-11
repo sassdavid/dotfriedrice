@@ -62,5 +62,4 @@ export DEFAULT_CONFIG_INSTALL_ARCH=(
 export DEFAULT_CONFIG_INSTALL_WSL=(
   "cp \"\${DOTFRIEDRICE_PATH}/mnt/c/Users/sassd/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json\" \"/mnt/c/Users/%WindowsUser/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json\" || true"
   "sudo ln -fns \"\${DOTFRIEDRICE_PATH}/etc/wsl.conf\" \"/etc/wsl.conf\""
-  "ln -fns \"/mnt/c/Windows/System32/cmd.exe\" \"\${HOME}/.local/bin/cmd.exe\""
 )

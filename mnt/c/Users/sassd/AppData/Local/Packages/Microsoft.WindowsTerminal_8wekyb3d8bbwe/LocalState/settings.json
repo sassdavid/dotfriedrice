@@ -2,7 +2,7 @@
   "$help": "https://aka.ms/terminal-documentation",
   "$schema": "https://aka.ms/terminal-profiles-schema",
   "actions": [],
-  "defaultProfile": "{56592c4f-38a4-45f5-96d5-6a15a0606c0d}",
+  "defaultProfile": "{a9741877-f895-512d-a385-bb120648fbbe}",
   "keybindings": [
     {
       "id": "Terminal.CopyToClipboard",
@@ -38,20 +38,17 @@
     },
     "list": [
       {
-        "guid": "{574e775e-4f2a-5b96-ac1e-a2962a402336}",
+        "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
         "hidden": false,
-        "name": "PowerShell",
-        "source": "Windows.Terminal.PowershellCore"
+        "name": "Windows PowerShell"
       },
       {
-        "commandline": "%PROGRAMFILES%/Git/bin/bash.exe --login -i -l",
-        "guid": "{56592c4f-38a4-45f5-96d5-6a15a0606c0d}",
+        "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}",
         "hidden": false,
-        "icon": "%PROGRAMFILES%/Git/mingw64/share/git/git-for-windows.ico",
-        "name": "Bash"
+        "name": "cmd"
       },
       {
-        "guid": "{7981339a-de80-5f81-8672-bd21300808cc}",
+        "guid": "{a9741877-f895-512d-a385-bb120648fbbe}",
         "hidden": false,
         "name": "Arch Linux",
         "source": "Microsoft.WSL"
