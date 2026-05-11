@@ -110,8 +110,8 @@ window-rule {
 }
 
 window-rule {
-    match app-id=r#"^dot\.floating\.ghostty$"#
-    match app-id=r#"^dot\.floating\.thunar$"#
+    match app-id=r#"^dfr\.floating\.ghostty$"#
+    match app-id=r#"^dfr\.floating\.thunar$"#
 
     open-floating true
     default-column-width { proportion 0.33; }

@@ -397,12 +397,8 @@ _curl() {
 
 _find_pwsh() {
   local p=
-  for p in \
-    pwsh.exe \
-    '/mnt/c/Program Files/PowerShell/7/pwsh.exe' \
-    powershell.exe \
-    '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe'; do
-    if command -v "$p" >/dev/null 2>&1 || [ -x "$p" ]; then
+  for p in pwsh.exe powershell.exe; do
+    if command -v "$p" >/dev/null 2>&1; then
       printf '%s' "$p"
       return 0
     fi
@@ -486,11 +482,6 @@ _windows_find_op_ssh_sign() {
     [ -x "${c}" ] && printf '%s' "${c}" && return 0
   done
   return 1
-}
-
-_escape_path_spaces() {
-  # /mnt/c/Program Files/OpenSSH -> /mnt/c/Program\ Files/OpenSSH
-  printf '%s' "${1// /\\ }"
 }
 
 _package_install() {
@@ -2018,7 +2009,7 @@ configure_git() {
   mapfile -t identities < <(printf '%s\n' "${identities[@]}" | sort)
 
   local windows_user=
-  windows_user="$(_windows_username 2>/dev/null || true)"
+  [[ "${OS_IN_WSL}" == "1" ]] && windows_user="$(_windows_username 2>/dev/null || true)"
 
   local ssh_sign_program=""
   if [[ "${OS_TYPE}" == "darwin" ]] && [[ -x "/Applications/1Password.app/Contents/MacOS/op-ssh-sign" ]]; then
@@ -2027,7 +2018,7 @@ configure_git() {
   if [[ -n "${windows_user}" ]]; then
     local op_sign=
     op_sign="$(_windows_find_op_ssh_sign "${windows_user}" 2>/dev/null || true)"
-    [[ -n "${op_sign}" ]] && ssh_sign_program="$(_escape_path_spaces "${op_sign}")"
+    [[ -n "${op_sign}" ]] && ssh_sign_program="${op_sign}"
   fi
   if [[ "${OS_TYPE}" == "linux" ]] && [[ "${OS_IN_WSL}" != "1" ]]; then
     # Check PATH first (covers DEB/RPM/AUR/tar.gz that add a symlink), then known
@@ -2252,19 +2243,16 @@ EOF
 
       # Configure Windows OpenSSH only if 1Password is installed on Windows.
       local win_ssh_dir=
-      local win_ssh_dir_esc=
 
       if _windows_has_1password; then
         win_ssh_dir="$(_windows_openssh_dir 2>/dev/null || true)"
         if [ -n "${win_ssh_dir}" ]; then
-          win_ssh_dir_esc="$(_escape_path_spaces "${win_ssh_dir}")"
-
           if ! grep -q "^export GIT_SSH=.*$" "${zprofile_path}" 2>/dev/null; then
             cat <<EOF >>"${zprofile_path}"
 
 # Configure Windows OpenSSH so the 1Password SSH agent is usable.
-export GIT_SSH="${win_ssh_dir_esc}/ssh.exe"
-export GIT_SSH_COMMAND="${win_ssh_dir_esc}/ssh.exe"
+export GIT_SSH="${win_ssh_dir}/ssh.exe"
+export GIT_SSH_COMMAND="${win_ssh_dir}/ssh.exe"
 EOF
           fi
 
@@ -2272,9 +2260,9 @@ EOF
             cat <<EOF >>"${aliases_path}"
 
 # Configure Windows OpenSSH so the 1Password SSH agent is usable.
-alias ssh="${win_ssh_dir_esc}/ssh.exe"
-alias ssh-add="${win_ssh_dir_esc}/ssh-add.exe"
-alias scp="${win_ssh_dir_esc}/scp.exe"
+alias ssh='${win_ssh_dir}/ssh.exe'
+alias ssh-add='${win_ssh_dir}/ssh-add.exe'
+alias scp='${win_ssh_dir}/scp.exe'
 
 alias ssh2="/usr/bin/ssh"
 EOF
