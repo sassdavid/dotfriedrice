@@ -175,7 +175,7 @@ and installing a
 distro](#how-to-get-set-up-on-windows-to-install-wsl-2-and-a-distro). Please
 follow that before installing DotFriedRice.
 
-If you're on macOS, you're good to and don't need to do anything extra.
+If you're on macOS, you're good to go and don't need to do anything extra.
 
 If you're on an Arch based distro, you're good to go and don't need to do anything extra.
 
@@ -583,12 +583,16 @@ At this point you have Arch installed and you can run the bootstrap script
 
 ### How to get started with the desktop environment?
 
-After logging in you'll be greeted with an empty desktop and a top bar:
+After logging in you'll be greeted with an empty desktop, a top bar and a
+welcome message. Here's a similar message in case it got closed or you want to
+get a feel for what to do after a fresh install:
 
 - A few key binds:
-  - `Mod + Alt + T  ::  Terminal`
-  - `Mod + Alt + B  ::  Browser`
-  - `Mod + /        ::  Show Global Hotkeys`
+  - `Mod + Alt + T :: Terminal`
+  - `Mod + Alt + B :: Browser`
+  - `Mod + <-      :: Scroll left`
+  - `Mod + ->      :: Scroll right`
+  - `Mod + /       :: View all key binds`
 - Connect to Wi-Fi *if needed* by clicking the Wi-Fi icon in the top right
   - Alternatively you can run `impala` from a terminal
   - If your system has no Wi-Fi adapter this tool won't be installed
@@ -598,7 +602,6 @@ After logging in you'll be greeted with an empty desktop and a top bar:
 - Verify your sound works by visiting YouTube or some site with audio
   - There's a sound icon in the top right to pick your input and output devices
   - Alternatively you can run `wiremix` from a terminal
-  - Both `mpd` and [rmpc](https://github.com/mierak/rmpc) are installed for playing music, configure your music directory!
 - Open a terminal and run `dfr` to switch to the DotFriedRice repo and open it in Neovim
   - Explore `.config/niri/config.kdl` for a complete list of key binds
 - Have fun with *your* new system!
