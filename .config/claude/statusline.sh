@@ -88,8 +88,8 @@ BAR_WIDTH=10
 FILLED=$((PCT * BAR_WIDTH / 100))
 EMPTY=$((BAR_WIDTH - FILLED))
 BAR=""
-for ((i=0; i<FILLED; i++)); do BAR="${BAR}█"; done
-for ((i=0; i<EMPTY; i++)); do BAR="${BAR}░"; done
+for ((i = 0; i < FILLED; i++)); do BAR="${BAR}█"; done
+for ((i = 0; i < EMPTY; i++)); do BAR="${BAR}░"; done
 
 if [ "$CONTEXT_SIZE" -ge 900000 ]; then
   CTX_LABEL="1m"

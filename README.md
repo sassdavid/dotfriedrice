@@ -12,6 +12,14 @@ If you're on an Arch based distro you can optionally add a complete
 [niri](https://github.com/niri-wm/niri) based desktop environment in addition
 to having all of the command line tools.
 
+### Demo video
+
+A walkthrough video by [Nick Janetakis](https://github.com/nickjj) covering the
+use, configuration, and installation of the niri-based desktop environment and
+CLI tools — well worth a watch:
+
+[![DotFriedRice](https://img.youtube.com/vi/RII3MI7xdeU/0.jpg)](https://www.youtube.com/watch?v=RII3MI7xdeU)
+
 ### Philosophy
 
 Just like fried rice, you can mix and match an assortment of flavors.
@@ -219,7 +227,7 @@ docker container run --rm -it -e "OS_IN_CONTAINER=1" -v "${PWD}:/app" -w /app de
 #
 # Since we can't open a new terminal in a container we'll need to manually
 # launch zsh and source a few files. That's what the last line is doing.
-apt-get update && apt-get install --yes --no-install-recommends curl \
+apt-get update && apt-get install --yes --no-install-recommends curl ca-certificates \
   && bash <(curl -fsSL https://raw.githubusercontent.com/sassdavid/dotfriedrice/main/bootstrap) \
   && zsh -c ". ~/.config/zsh/.zprofile && . ~/.config/zsh/.zshrc; zsh -i"
 ```
@@ -580,6 +588,8 @@ in.
 
 At this point you have Arch installed and you can run the bootstrap script
 [mentioned earlier in this readme](#%EF%B8%8F-install) to install DotFriedRice!
+There's also a [video guide by Nick Janetakis](https://www.youtube.com/watch?v=RII3MI7xdeU&t=4191s)
+walking through the installation — well worth a watch.
 
 ### How to get started with the desktop environment?
 
@@ -747,7 +757,7 @@ spot.
 I'm a Developer and DevOps Engineer with a degree in Computer Engineering, I am passionate about leveraging my technical expertise to design,
 optimize, and maintain robust infrastructure solutions that drive impactful outcomes. You can read about everything I've learned along the way on my
 site at
-[https://davidsass.eu](https://davidsass.eu/).
+[https://sasskovacs.dev](https://sasskovacs.dev).
 
 ## 🤝 Acknowledgements
 

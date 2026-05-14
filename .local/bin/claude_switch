@@ -8,12 +8,17 @@
 #USAGE arg "[mode]" help="Profile to activate (default: status)" default="status" {
 #USAGE   choices "personal" "bedrock" "status"
 #USAGE }
-#USAGE flag "--profile <profile>" help="AWS SSO profile name (required for bedrock; updates .local if changed)"
-#USAGE flag "--region <region>"   help="AWS region (required for bedrock; updates .local if changed)"
-#USAGE example "claude_switch personal"                                                   header="Switch to personal subscription"
-#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2"  header="Switch to bedrock (bootstraps .local from example if missing)"
-#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-east-1"  header="Switch to bedrock and update credentials in .local"
-#USAGE example "claude_switch status"                                                     header="Show current active profile"
+#USAGE flag "--profile <profile>"  help="AWS SSO profile name (required for bedrock; updates .local if changed)"
+#USAGE flag "--region <region>"    help="AWS region (required for bedrock; updates .local if changed)"
+#USAGE flag "--wsl"                help="Use --no-browser for AWS SSO login (WSL/headless environments; bedrock only)"
+#USAGE flag "--long-context"       help="Use 1M-context model variants with [1m] suffix; absent strips [1m] (bedrock only)"
+#USAGE example "claude_switch personal"                                                                        header="Switch to personal subscription"
+#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2"                       header="Switch to bedrock (bootstraps .local from example if missing)"
+#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-east-1"                       header="Switch to bedrock and update credentials in .local"
+#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2 --wsl"                 header="Switch to bedrock with headless AWS SSO login (WSL)"
+#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2 --long-context"        header="Switch to bedrock with 1M-context models"
+#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2 --wsl --long-context"  header="Switch to bedrock with WSL login and 1M-context models"
+#USAGE example "claude_switch status"                                                                          header="Show current active profile"
 
 set -o errexit
 set -o pipefail
@@ -28,22 +33,29 @@ bedrock_example="${dotfriedrice_claude}/settings_bedrock.json.example"
 mode="${usage_mode:-status}"
 aws_profile="${usage_profile:-}"
 aws_region="${usage_region:-}"
+use_wsl="${usage_wsl:-}"
+use_long_context="${usage_long_context:-}"
 
 _status() {
   if [[ -L "${target}" ]]; then
     real="$(readlink "${target}")"
     case "${real}" in
-      *personal*) echo "current: personal" ;;
-      *bedrock*)
-        local aws_prof
-        aws_prof="$(jq -r '.env.AWS_PROFILE // ""' "${real}" 2>/dev/null)"
-        if [[ -n "${aws_prof}" ]]; then
-          echo "current: bedrock (${aws_prof})"
-        else
-          echo "current: bedrock"
-        fi
-        ;;
-      *) echo "current: unknown → ${real}" ;;
+    *personal*) echo "current: personal" ;;
+    *bedrock*)
+      local aws_prof auth_refresh opus_model tags
+      aws_prof="$(jq -r '.env.AWS_PROFILE // ""' "${real}" 2>/dev/null)"
+      auth_refresh="$(jq -r '.awsAuthRefresh // ""' "${real}" 2>/dev/null)"
+      opus_model="$(jq -r '.env.ANTHROPIC_DEFAULT_OPUS_MODEL // ""' "${real}" 2>/dev/null)"
+      tags=""
+      [[ "${auth_refresh}" == *"--no-browser"* ]] && tags+=" [wsl]"
+      [[ "${opus_model}" == *"[1m]"* ]] && tags+=" [1m]"
+      if [[ -n "${aws_prof}" ]]; then
+        printf 'current: bedrock (%s)%s\n' "${aws_prof}" "${tags}"
+      else
+        printf 'current: bedrock%s\n' "${tags}"
+      fi
+      ;;
+    *) echo "current: unknown → ${real}" ;;
     esac
   elif [[ ! -e "${target}" ]]; then
     printf 'No active profile: %s does not exist\nRun: claude_switch bedrock|personal\n' "${target}" >&2
@@ -64,17 +76,38 @@ _bootstrap_bedrock() {
 }
 
 _update_bedrock_credentials() {
-  local file="${1}" profile="${2}" region="${3}"
+  local file="${1}" profile="${2}" region="${3}" wsl="${4}" long_context="${5}"
 
-  local current_profile current_region
+  local current_profile current_region current_auth_refresh current_opus_model
   current_profile="$(jq -r '.env.AWS_PROFILE // ""' "${file}")"
   current_region="$(jq -r '.env.AWS_REGION // ""' "${file}")"
+  current_auth_refresh="$(jq -r '.awsAuthRefresh // ""' "${file}")"
+  current_opus_model="$(jq -r '.env.ANTHROPIC_DEFAULT_OPUS_MODEL // ""' "${file}")"
 
-  local profile_changed=false region_changed=false
+  local effective_profile="${profile:-${current_profile}}"
+
+  local desired_auth_refresh
+  if [[ "${wsl}" == "true" ]]; then
+    desired_auth_refresh="aws sso login --no-browser --profile ${effective_profile}"
+  else
+    desired_auth_refresh="aws sso login --profile ${effective_profile}"
+  fi
+
+  local desired_opus_model
+  if [[ "${long_context}" == "true" ]]; then
+    desired_opus_model="global.anthropic.claude-opus-4-7[1m]"
+  else
+    desired_opus_model="global.anthropic.claude-opus-4-7"
+  fi
+
+  local profile_changed=false region_changed=false auth_changed=false model_changed=false
   [[ -n "${profile}" && "${current_profile}" != "${profile}" ]] && profile_changed=true
   [[ -n "${region}" && "${current_region}" != "${region}" ]] && region_changed=true
+  [[ "${current_auth_refresh}" != "${desired_auth_refresh}" ]] && auth_changed=true
+  [[ "${current_opus_model}" != "${desired_opus_model}" ]] && model_changed=true
 
-  if [[ "${profile_changed}" == "false" && "${region_changed}" == "false" ]]; then
+  if [[ "${profile_changed}" == "false" && "${region_changed}" == "false" &&
+    "${auth_changed}" == "false" && "${model_changed}" == "false" ]]; then
     return 0
   fi
 
@@ -83,16 +116,54 @@ _update_bedrock_credentials() {
   # shellcheck disable=SC2064
   trap "rm -f '${tmp}'" RETURN
 
-  jq --arg p "${profile}" --arg r "${region}" \
-    --argjson pc "${profile_changed}" --argjson rc "${region_changed}" '
-    if $pc then .awsAuthRefresh = "aws sso login --profile \($p)" | .env.AWS_PROFILE = $p else . end |
-    if $rc then .env.AWS_DEFAULT_REGION = $r | .env.AWS_REGION = $r else . end
+  jq --arg p "${profile}" \
+    --arg r "${region}" \
+    --arg cp "${current_profile}" \
+    --argjson pc "${profile_changed}" \
+    --argjson rc "${region_changed}" \
+    --argjson ac "${auth_changed}" \
+    --argjson mc "${model_changed}" \
+    --argjson wsl "${wsl}" \
+    --argjson lctx "${long_context}" '
+    (if $p != "" then $p else $cp end) as $eff_p |
+    if $pc   then .env.AWS_PROFILE = $p else . end |
+    if $rc   then .env.AWS_DEFAULT_REGION = $r | .env.AWS_REGION = $r else . end |
+    if $ac   then
+      .awsAuthRefresh = ("aws sso login " + (if $wsl then "--no-browser " else "" end) + "--profile " + $eff_p)
+    else . end |
+    if $mc   then
+      (if $lctx then "global.anthropic.claude-opus-4-7[1m]"   else "global.anthropic.claude-opus-4-7"   end) as $opus   |
+      (if $lctx then "global.anthropic.claude-sonnet-4-6[1m]" else "global.anthropic.claude-sonnet-4-6" end) as $sonnet |
+      .env.ANTHROPIC_DEFAULT_OPUS_MODEL    = $opus   |
+      .env.ANTHROPIC_DEFAULT_SONNET_MODEL  = $sonnet |
+      .modelOverrides["claude-opus-4-7"]   = $opus   |
+      .modelOverrides["claude-sonnet-4-6"] = $sonnet
+    else . end
   ' "${file}" >"${tmp}" && mv "${tmp}" "${file}"
 
-  if "${profile_changed}"; then printf 'Updated AWS_PROFILE → %s\n' "${profile}"; fi
-  if "${region_changed}"; then printf 'Updated AWS_REGION → %s\n' "${region}"; fi
-  printf 'Credentials updated in %s\n' "${bedrock}"
+  if "${profile_changed}"; then printf 'Updated AWS_PROFILE       → %s\n' "${profile}"; fi
+  if "${region_changed}"; then printf 'Updated AWS_REGION        → %s\n' "${region}"; fi
+  if "${auth_changed}"; then
+    if [[ "${wsl}" == "true" ]]; then
+      printf 'Updated awsAuthRefresh    → headless (--no-browser)\n'
+    else
+      printf 'Updated awsAuthRefresh    → standard\n'
+    fi
+  fi
+  if "${model_changed}"; then
+    if [[ "${long_context}" == "true" ]]; then
+      printf 'Updated models            → 1M-context [1m] variants\n'
+    else
+      printf 'Updated models            → standard variants\n'
+    fi
+  fi
+  printf 'Settings updated in %s\n' "${file}"
 }
+
+if [[ -n "${use_wsl}" || -n "${use_long_context}" ]] && [[ "${mode}" != "bedrock" ]]; then
+  printf 'Error: --wsl and --long-context are only supported for bedrock mode\n' >&2
+  exit 1
+fi
 
 if [[ "${mode}" == "bedrock" ]]; then
   [[ -n "${aws_profile}" ]] || {
@@ -106,22 +177,22 @@ if [[ "${mode}" == "bedrock" ]]; then
 fi
 
 case "${mode}" in
-  personal)
-    [[ -f "${personal}" ]] || {
-      printf 'Error: %s not found\n' "${personal}" >&2
-      exit 1
-    }
-    ln -fns "${personal}" "${target}"
-    printf 'Switched to personal config\n'
-    ;;
-  bedrock)
-    _bootstrap_bedrock
-    [[ -n "${aws_profile}" || -n "${aws_region}" ]] \
-      && _update_bedrock_credentials "${bedrock}" "${aws_profile}" "${aws_region}"
-    ln -fns "${bedrock}" "${target}"
-    printf 'Switched to bedrock config\n'
-    ;;
-  status)
-    _status
-    ;;
+personal)
+  [[ -f "${personal}" ]] || {
+    printf 'Error: %s not found\n' "${personal}" >&2
+    exit 1
+  }
+  ln -fns "${personal}" "${target}"
+  printf 'Switched to personal config\n'
+  ;;
+bedrock)
+  _bootstrap_bedrock
+  _update_bedrock_credentials "${bedrock}" "${aws_profile}" "${aws_region}" \
+    "${use_wsl:-false}" "${use_long_context:-false}"
+  ln -fns "${bedrock}" "${target}"
+  printf 'Switched to bedrock config\n'
+  ;;
+status)
+  _status
+  ;;
 esac
