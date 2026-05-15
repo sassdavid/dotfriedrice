@@ -4,21 +4,21 @@
 # shellcheck shell=bash
 
 #USAGE name "claude_switch"
-#USAGE about "Switch the active Claude Code settings profile.\n\nUses ~/.claude/settings.json as a symlink pointing to the active profile.\nSettings live in the dotfriedrice repo under .config/claude/:\n  settings_personal.json        — tracked, no secrets\n  settings_bedrock.json.local   — gitignored, contains AWS credentials\n  settings_bedrock.json.example — tracked template; used to bootstrap .local"
+#USAGE about "Switch the active Claude Code settings profile.\n\nUses ~/.claude/settings.json as a symlink pointing to the active profile.\nSettings live in the dotfriedrice repo under .config/claude/:\n  settings_personal.json         — tracked, no secrets\n  settings_bedrock.json.local    — gitignored; Amazon Bedrock (AWS-operated) creds\n  settings_platform.json.local   — gitignored; Claude Platform on AWS (Anthropic-operated) creds + workspace id\n  settings_cloud.json.example    — tracked shared template; bootstraps both .local files"
 #USAGE arg "[mode]" help="Profile to activate (default: status)" default="status" {
-#USAGE   choices "personal" "bedrock" "status"
+#USAGE   choices "personal" "bedrock" "platform" "status"
 #USAGE }
-#USAGE flag "--profile <profile>"  help="AWS SSO profile name (required for bedrock; updates .local if changed)"
-#USAGE flag "--region <region>"    help="AWS region (required for bedrock; updates .local if changed)"
-#USAGE flag "--wsl"                help="Use --no-browser for AWS SSO login (WSL/headless environments; bedrock only)"
-#USAGE flag "--long-context"       help="Use 1M-context model variants with [1m] suffix; absent strips [1m] (bedrock only)"
-#USAGE example "claude_switch personal"                                                                        header="Switch to personal subscription"
-#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2"                       header="Switch to bedrock (bootstraps .local from example if missing)"
-#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-east-1"                       header="Switch to bedrock and update credentials in .local"
-#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2 --wsl"                 header="Switch to bedrock with headless AWS SSO login (WSL)"
-#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2 --long-context"        header="Switch to bedrock with 1M-context models"
-#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2 --wsl --long-context"  header="Switch to bedrock with WSL login and 1M-context models"
-#USAGE example "claude_switch status"                                                                          header="Show current active profile"
+#USAGE flag "--profile <profile>"          help="AWS SSO profile name (required for bedrock/platform; updates .local if changed)"
+#USAGE flag "--region <region>"            help="AWS region (required for bedrock/platform; updates .local if changed)"
+#USAGE flag "--workspace-id <workspace_id>" help="Claude Platform on AWS workspace id, wrkspc_… (required for platform only)"
+#USAGE flag "--wsl"                        help="Use --no-browser for AWS SSO login (WSL/headless; bedrock/platform only)"
+#USAGE flag "--long-context"               help="Enable 1M context: bedrock uses [1m] model variants, platform sets the context-1m anthropic-beta header (bedrock/platform only)"
+#USAGE example "claude_switch personal"                                                                                           header="Switch to personal subscription"
+#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2"                                            header="Switch to Amazon Bedrock (bootstraps .local if missing)"
+#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2 --wsl --long-context"                       header="Switch to Amazon Bedrock with WSL login and 1M-context models"
+#USAGE example "claude_switch platform --profile loxon-generative-ai --region us-west-2 --workspace-id wrkspc_01ABCDEF"            header="Switch to Claude Platform on AWS"
+#USAGE example "claude_switch platform --profile loxon-generative-ai --region us-west-2 --workspace-id wrkspc_01ABCDEF --long-context" header="Switch to Claude Platform on AWS with 1M context"
+#USAGE example "claude_switch status"                                                                                             header="Show current active profile"
 
 set -o errexit
 set -o pipefail
@@ -28,11 +28,13 @@ dotfriedrice_claude="${DOTFRIEDRICE_PATH:-${HOME}/src/github/dotfriedrice}/.conf
 target="${HOME}/.claude/settings.json"
 personal="${dotfriedrice_claude}/settings_personal.json"
 bedrock="${dotfriedrice_claude}/settings_bedrock.json.local"
-bedrock_example="${dotfriedrice_claude}/settings_bedrock.json.example"
+platform="${dotfriedrice_claude}/settings_platform.json.local"
+cloud_example="${dotfriedrice_claude}/settings_cloud.json.example"
 
 mode="${usage_mode:-status}"
 aws_profile="${usage_profile:-}"
 aws_region="${usage_region:-}"
+workspace_id="${usage_workspace_id:-}"
 use_wsl="${usage_wsl:-}"
 use_long_context="${usage_long_context:-}"
 
@@ -55,6 +57,20 @@ _status() {
         printf 'current: bedrock%s\n' "${tags}"
       fi
       ;;
+    *platform*)
+      local aws_prof auth_refresh betas tags
+      aws_prof="$(jq -r '.env.AWS_PROFILE // ""' "${real}" 2>/dev/null)"
+      auth_refresh="$(jq -r '.awsAuthRefresh // ""' "${real}" 2>/dev/null)"
+      betas="$(jq -r '.env.ANTHROPIC_BETAS // ""' "${real}" 2>/dev/null)"
+      tags=""
+      [[ "${auth_refresh}" == *"--no-browser"* ]] && tags+=" [wsl]"
+      [[ "${betas}" == *"context-1m"* ]] && tags+=" [1m]"
+      if [[ -n "${aws_prof}" ]]; then
+        printf 'current: platform (%s)%s\n' "${aws_prof}" "${tags}"
+      else
+        printf 'current: platform%s\n' "${tags}"
+      fi
+      ;;
     *) echo "current: unknown → ${real}" ;;
     esac
   elif [[ ! -e "${target}" ]]; then
@@ -66,12 +82,23 @@ _status() {
 
 _bootstrap_bedrock() {
   if [[ ! -f "${bedrock}" ]]; then
-    if [[ ! -f "${bedrock_example}" ]]; then
-      printf 'Error: example file not found: %s\n' "${bedrock_example}" >&2
+    if [[ ! -f "${cloud_example}" ]]; then
+      printf 'Error: example file not found: %s\n' "${cloud_example}" >&2
       exit 1
     fi
-    cp "${bedrock_example}" "${bedrock}"
+    cp "${cloud_example}" "${bedrock}"
     printf 'Bootstrapped %s from example\n' "${bedrock}"
+  fi
+}
+
+_bootstrap_platform() {
+  if [[ ! -f "${platform}" ]]; then
+    if [[ ! -f "${cloud_example}" ]]; then
+      printf 'Error: example file not found: %s\n' "${cloud_example}" >&2
+      exit 1
+    fi
+    cp "${cloud_example}" "${platform}"
+    printf 'Bootstrapped %s from example\n' "${platform}"
   fi
 }
 
@@ -139,6 +166,7 @@ _update_bedrock_credentials() {
       .modelOverrides["claude-opus-4-7"]   = $opus   |
       .modelOverrides["claude-sonnet-4-6"] = $sonnet
     else . end
+    | .env |= (to_entries | sort_by(.key) | from_entries)
   ' "${file}" >"${tmp}" && mv "${tmp}" "${file}"
 
   if "${profile_changed}"; then printf 'Updated AWS_PROFILE       → %s\n' "${profile}"; fi
@@ -160,8 +188,92 @@ _update_bedrock_credentials() {
   printf 'Settings updated in %s\n' "${file}"
 }
 
-if [[ -n "${use_wsl}" || -n "${use_long_context}" ]] && [[ "${mode}" != "bedrock" ]]; then
-  printf 'Error: --wsl and --long-context are only supported for bedrock mode\n' >&2
+# Transforms a (possibly bedrock-shaped) settings file into Claude Platform on
+# AWS shape, deterministically and idempotently. Anthropic operates this stack;
+# AWS only provides SigV4 auth + the workspace id, so the Bedrock/Mantle routing
+# flags MUST be absent and model IDs are the plain Claude API IDs (no prefix or
+# [1m] suffix — 1M context is requested via the context-1m anthropic-beta).
+_update_platform_credentials() {
+  local file="${1}" profile="${2}" region="${3}" wsl="${4}" long_context="${5}" wid="${6}"
+
+  local current_profile current_region current_auth_refresh current_wid current_betas
+  current_profile="$(jq -r '.env.AWS_PROFILE // ""' "${file}")"
+  current_region="$(jq -r '.env.AWS_REGION // ""' "${file}")"
+  current_auth_refresh="$(jq -r '.awsAuthRefresh // ""' "${file}")"
+  current_wid="$(jq -r '.env.ANTHROPIC_AWS_WORKSPACE_ID // ""' "${file}")"
+  current_betas="$(jq -r '.env.ANTHROPIC_BETAS // ""' "${file}")"
+
+  local desired_auth_refresh
+  if [[ "${wsl}" == "true" ]]; then
+    desired_auth_refresh="aws sso login --no-browser --profile ${profile}"
+  else
+    desired_auth_refresh="aws sso login --profile ${profile}"
+  fi
+
+  local desired_betas=""
+  [[ "${long_context}" == "true" ]] && desired_betas="context-1m-2025-08-07"
+
+  local tmp
+  tmp="$(mktemp)"
+  # shellcheck disable=SC2064
+  trap "rm -f '${tmp}'" RETURN
+
+  jq --arg p "${profile}" \
+    --arg r "${region}" \
+    --arg w "${wid}" \
+    --arg auth "${desired_auth_refresh}" \
+    --arg betas "${desired_betas}" '
+    .env.AWS_PROFILE = $p
+    | .env.AWS_REGION = $r
+    | .env.AWS_DEFAULT_REGION = $r
+    | .awsAuthRefresh = $auth
+    | .env.CLAUDE_CODE_USE_ANTHROPIC_AWS = "1"
+    | .env.ANTHROPIC_AWS_WORKSPACE_ID = $w
+    | .env.ANTHROPIC_DEFAULT_OPUS_MODEL   = "claude-opus-4-7"
+    | .env.ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-sonnet-4-6"
+    | .env.ANTHROPIC_DEFAULT_HAIKU_MODEL  = "claude-haiku-4-5"
+    | .availableModels = ["claude-haiku-4-5", "claude-opus-4-7", "claude-sonnet-4-6"]
+    | del(.env.CLAUDE_CODE_USE_BEDROCK,
+          .env.CLAUDE_CODE_USE_MANTLE,
+          .env.ANTHROPIC_BEDROCK_SERVICE_TIER,
+          .modelOverrides)
+    | if $betas == "" then del(.env.ANTHROPIC_BETAS) else .env.ANTHROPIC_BETAS = $betas end
+    | .env |= (to_entries | sort_by(.key) | from_entries)
+  ' "${file}" >"${tmp}"
+
+  if cmp -s "${tmp}" "${file}"; then
+    return 0
+  fi
+  mv "${tmp}" "${file}"
+
+  [[ "${current_profile}" != "${profile}" ]] && printf 'Updated AWS_PROFILE               → %s\n' "${profile}"
+  [[ "${current_region}" != "${region}" ]] && printf 'Updated AWS_REGION                → %s\n' "${region}"
+  [[ "${current_wid}" != "${wid}" ]] && printf 'Updated ANTHROPIC_AWS_WORKSPACE_ID → %s\n' "${wid}"
+  if [[ "${current_auth_refresh}" != "${desired_auth_refresh}" ]]; then
+    if [[ "${wsl}" == "true" ]]; then
+      printf 'Updated awsAuthRefresh            → headless (--no-browser)\n'
+    else
+      printf 'Updated awsAuthRefresh            → standard\n'
+    fi
+  fi
+  if [[ "${current_betas}" != "${desired_betas}" ]]; then
+    if [[ "${long_context}" == "true" ]]; then
+      printf 'Updated context window           → 1M (anthropic-beta context-1m-2025-08-07)\n'
+    else
+      printf 'Updated context window           → standard (200K)\n'
+    fi
+  fi
+  printf 'Settings updated in %s\n' "${file}"
+}
+
+if [[ -n "${use_wsl}" || -n "${use_long_context}" ]] &&
+  [[ "${mode}" != "bedrock" && "${mode}" != "platform" ]]; then
+  printf 'Error: --wsl and --long-context are only supported for bedrock and platform modes\n' >&2
+  exit 1
+fi
+
+if [[ -n "${workspace_id}" && "${mode}" != "platform" ]]; then
+  printf 'Error: --workspace-id is only supported for platform mode\n' >&2
   exit 1
 fi
 
@@ -172,6 +284,21 @@ if [[ "${mode}" == "bedrock" ]]; then
   }
   [[ -n "${aws_region}" ]] || {
     printf 'Error: --region is required when switching to bedrock\n' >&2
+    exit 1
+  }
+fi
+
+if [[ "${mode}" == "platform" ]]; then
+  [[ -n "${aws_profile}" ]] || {
+    printf 'Error: --profile is required when switching to platform\n' >&2
+    exit 1
+  }
+  [[ -n "${aws_region}" ]] || {
+    printf 'Error: --region is required when switching to platform\n' >&2
+    exit 1
+  }
+  [[ -n "${workspace_id}" ]] || {
+    printf 'Error: --workspace-id is required when switching to platform\n' >&2
     exit 1
   }
 fi
@@ -191,6 +318,13 @@ bedrock)
     "${use_wsl:-false}" "${use_long_context:-false}"
   ln -fns "${bedrock}" "${target}"
   printf 'Switched to bedrock config\n'
+  ;;
+platform)
+  _bootstrap_platform
+  _update_platform_credentials "${platform}" "${aws_profile}" "${aws_region}" \
+    "${use_wsl:-false}" "${use_long_context:-false}" "${workspace_id}"
+  ln -fns "${platform}" "${target}"
+  printf 'Switched to Claude Platform on AWS config\n'
   ;;
 status)
   _status
