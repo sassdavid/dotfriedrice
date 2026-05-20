@@ -20,8 +20,12 @@ printf -- '--------------------------------------------------------\n'
 printf 'Welcome to DotFriedRice, this message only appears once!\n'
 printf -- '--------------------------------------------------------\n'
 
-if compgen -G \"/sys/class/net/*/wireless\" 1>/dev/null; then
-  printf '\n  Setup Wi-Fi\n   After launching impala in the top right, it shows a help menu on the bottom\n'
+if ! ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1; then
+  if compgen -G \"/sys/class/net/*/wireless\" 1>/dev/null; then
+    printf '\n  Setup Wi-Fi\n   After launching impala in the top right, it shows a help menu on the bottom\n'
+  else
+    printf '\n󰅛  Plug in Ethernet\n   No internet connection detected, is your ethernet cable plugged in?\n'
+  fi
 fi
 
 if [ -d \"/sys/class/bluetooth\" ]; then
