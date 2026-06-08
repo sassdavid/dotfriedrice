@@ -19,7 +19,12 @@ eval "$(echo "$input" | jq -r '
   @sh "RATE_5H_RESET=\(.rate_limits.five_hour.resets_at // "")",
   @sh "RATE_7D_PCT=\(.rate_limits.seven_day.used_percentage // "")",
   @sh "RATE_7D_RESET=\(.rate_limits.seven_day.resets_at // "")",
-  @sh "EXCEEDS_200K=\(.exceeds_200k_tokens // false)"
+  @sh "EXCEEDS_200K=\(.exceeds_200k_tokens // false)",
+  @sh "SESSION_NAME=\(.session_name // "")",
+  @sh "PR_NUMBER=\(.pr.number // "")",
+  @sh "PR_URL=\(.pr.url // "")",
+  @sh "PR_STATE=\(.pr.review_state // "")",
+  @sh "COST_NONZERO=\(if (.cost.total_cost_usd // 0) > 0 then 1 else 0 end)"
 ')"
 
 # ANSI colors
@@ -42,10 +47,10 @@ cache_is_stale() {
 }
 
 if cache_is_stale; then
-  if git rev-parse --git-dir >/dev/null 2>&1; then
-    BRANCH=$(git branch --show-current 2>/dev/null)
-    STAGED=$(git diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ')
-    MODIFIED=$(git diff --numstat 2>/dev/null | wc -l | tr -d ' ')
+  if git -C "$CURRENT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+    BRANCH=$(git -C "$CURRENT_DIR" branch --show-current 2>/dev/null)
+    STAGED=$(git -C "$CURRENT_DIR" diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ')
+    MODIFIED=$(git -C "$CURRENT_DIR" diff --numstat 2>/dev/null | wc -l | tr -d ' ')
     echo "$BRANCH|$STAGED|$MODIFIED" >"$CACHE_FILE"
   else
     echo "||" >"$CACHE_FILE"
@@ -61,13 +66,36 @@ if [ -n "$BRANCH" ]; then
   [ "$MODIFIED" -gt 0 ] && GIT_INFO="${GIT_INFO} ${YELLOW}~${MODIFIED}${RESET}"
 fi
 
-# --- Line 1: model [· effort], directory, git ---
+# --- Line 1: model [· effort], session name, directory, git, PR ---
 
 MODEL_DISPLAY="${CYAN}[${MODEL}"
 [ -n "$EFFORT_LEVEL" ] && MODEL_DISPLAY="${MODEL_DISPLAY} · ${EFFORT_LEVEL}"
 MODEL_DISPLAY="${MODEL_DISPLAY}]${RESET}"
 
-echo -e "${MODEL_DISPLAY} ${CURRENT_DIR##*/}${GIT_INFO}"
+# Custom session name (set via --name or /rename); absent otherwise
+SESSION_LABEL=""
+[ -n "$SESSION_NAME" ] && SESSION_LABEL=" ${DIM}‹${SESSION_NAME}›${RESET}"
+
+# PR badge: Claude Code populates .pr via the gh CLI, so this lights up on
+# GitHub repos only. On Bitbucket the field is absent and nothing is shown.
+PR_INFO=""
+if [ -n "$PR_NUMBER" ]; then
+  case "$PR_STATE" in
+    approved)          PR_COLOR="$GREEN";  PR_ICON="✓" ;;
+    changes_requested) PR_COLOR="$RED";    PR_ICON="✗" ;;
+    draft)             PR_COLOR="$DIM";    PR_ICON="◐" ;;
+    *)                 PR_COLOR="$YELLOW"; PR_ICON="•" ;;
+  esac
+  if [ -n "$PR_URL" ]; then
+    # OSC 8 clickable link (Cmd/Ctrl+click) wrapping the PR number
+    printf -v PR_LINK '\033]8;;%s\aPR#%s\033]8;;\a' "$PR_URL" "$PR_NUMBER"
+  else
+    PR_LINK="PR#${PR_NUMBER}"
+  fi
+  PR_INFO=" ${DIM}|${RESET} ${PR_COLOR}${PR_LINK} ${PR_ICON}${RESET}"
+fi
+
+echo -e "${MODEL_DISPLAY}${SESSION_LABEL} ${CURRENT_DIR##*/}${GIT_INFO}${PR_INFO}"
 
 # --- Line 2: context progress bar, cost, duration, api duration, code changes ---
 
@@ -100,8 +128,8 @@ fi
 LINE2="${BAR_COLOR}${BAR}${RESET} ${PCT}% ${DIM}${CTX_LABEL}${RESET}"
 [ "$EXCEEDS_200K" = "true" ] && LINE2="${LINE2} ${RED}>200k${RESET}"
 
-# Cost (only if > 0)
-if [ "$(echo "$COST_TOTAL > 0" | bc -l 2>/dev/null)" = "1" ]; then
+# Cost (only if > 0; comparison done in the jq pass to avoid a bc dependency)
+if [ "$COST_NONZERO" = "1" ]; then
   COST_FMT=$(printf '$%.4f' "$COST_TOTAL")
   LINE2="${LINE2} ${DIM}|${RESET} ${YELLOW}${COST_FMT}${RESET}"
 fi
