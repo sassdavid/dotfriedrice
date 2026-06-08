@@ -81,10 +81,22 @@ SESSION_LABEL=""
 PR_INFO=""
 if [ -n "$PR_NUMBER" ]; then
   case "$PR_STATE" in
-    approved)          PR_COLOR="$GREEN";  PR_ICON="✓" ;;
-    changes_requested) PR_COLOR="$RED";    PR_ICON="✗" ;;
-    draft)             PR_COLOR="$DIM";    PR_ICON="◐" ;;
-    *)                 PR_COLOR="$YELLOW"; PR_ICON="•" ;;
+  approved)
+    PR_COLOR="$GREEN"
+    PR_ICON="✓"
+    ;;
+  changes_requested)
+    PR_COLOR="$RED"
+    PR_ICON="✗"
+    ;;
+  draft)
+    PR_COLOR="$DIM"
+    PR_ICON="◐"
+    ;;
+  *)
+    PR_COLOR="$YELLOW"
+    PR_ICON="•"
+    ;;
   esac
   if [ -n "$PR_URL" ]; then
     # OSC 8 clickable link (Cmd/Ctrl+click) wrapping the PR number
