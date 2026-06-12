@@ -12,12 +12,12 @@
 #USAGE flag "--region <region>"            help="AWS region (required for bedrock/platform; updates .local if changed)"
 #USAGE flag "--workspace-id <workspace_id>" help="Claude Platform on AWS workspace id, wrkspc_… (required for platform only)"
 #USAGE flag "--wsl"                        help="Use --no-browser for AWS SSO login (WSL/headless; bedrock/platform only)"
-#USAGE flag "--long-context"               help="Enable 1M context: bedrock uses [1m] model variants, platform sets the context-1m anthropic-beta header (bedrock/platform only)"
+#USAGE flag "--no-long-context"            help="Disable 1M context (1M is the default): bedrock uses non-[1m] model variants, platform omits the context-1m anthropic-beta header (bedrock/platform only)"
 #USAGE example "claude_switch personal"                                                                                           header="Switch to personal subscription"
-#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2"                                            header="Switch to Amazon Bedrock (bootstraps .local if missing)"
-#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2 --wsl --long-context"                       header="Switch to Amazon Bedrock with WSL login and 1M-context models"
-#USAGE example "claude_switch platform --profile loxon-generative-ai --region us-west-2 --workspace-id wrkspc_01ABCDEF"            header="Switch to Claude Platform on AWS"
-#USAGE example "claude_switch platform --profile loxon-generative-ai --region us-west-2 --workspace-id wrkspc_01ABCDEF --long-context" header="Switch to Claude Platform on AWS with 1M context"
+#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2"                                            header="Switch to Amazon Bedrock (1M context by default; bootstraps .local if missing)"
+#USAGE example "claude_switch bedrock --profile loxon-generative-ai --region us-west-2 --wsl --no-long-context"                    header="Switch to Amazon Bedrock with WSL login and standard 200K context"
+#USAGE example "claude_switch platform --profile loxon-generative-ai --region us-west-2 --workspace-id wrkspc_01ABCDEF"            header="Switch to Claude Platform on AWS (1M context by default)"
+#USAGE example "claude_switch platform --profile loxon-generative-ai --region us-west-2 --workspace-id wrkspc_01ABCDEF --no-long-context" header="Switch to Claude Platform on AWS with standard 200K context"
 #USAGE example "claude_switch status"                                                                                             header="Show current active profile"
 
 set -o errexit
@@ -36,7 +36,14 @@ aws_profile="${usage_profile:-}"
 aws_region="${usage_region:-}"
 workspace_id="${usage_workspace_id:-}"
 use_wsl="${usage_wsl:-}"
-use_long_context="${usage_long_context:-}"
+use_no_long_context="${usage_no_long_context:-}"
+
+# 1M context is the default; --no-long-context opts down to standard 200K.
+if [[ -n "${use_no_long_context}" ]]; then
+  long_context="false"
+else
+  long_context="true"
+fi
 
 _status() {
   if [[ -L "${target}" ]]; then
@@ -113,6 +120,10 @@ _update_bedrock_credentials() {
 
   local effective_profile="${profile:-${current_profile}}"
 
+  # The bedrock profile deliberately carries no availableModels/modelOverrides:
+  # the /model picker derives rows straight from the ANTHROPIC_DEFAULT_*_MODEL
+  # pins, so this updater manages only credentials and the model pins.
+
   local desired_auth_refresh
   if [[ "${wsl}" == "true" ]]; then
     desired_auth_refresh="aws sso login --no-browser --profile ${effective_profile}"
@@ -162,9 +173,7 @@ _update_bedrock_credentials() {
       (if $lctx then "global.anthropic.claude-opus-4-8[1m]"   else "global.anthropic.claude-opus-4-8"   end) as $opus   |
       (if $lctx then "global.anthropic.claude-sonnet-4-6[1m]" else "global.anthropic.claude-sonnet-4-6" end) as $sonnet |
       .env.ANTHROPIC_DEFAULT_OPUS_MODEL    = $opus   |
-      .env.ANTHROPIC_DEFAULT_SONNET_MODEL  = $sonnet |
-      .modelOverrides["claude-opus-4-8"]   = $opus   |
-      .modelOverrides["claude-sonnet-4-6"] = $sonnet
+      .env.ANTHROPIC_DEFAULT_SONNET_MODEL  = $sonnet
     else . end
     | .env |= (to_entries | sort_by(.key) | from_entries)
   ' "${file}" >"${tmp}" && mv "${tmp}" "${file}"
@@ -232,11 +241,12 @@ _update_platform_credentials() {
     | .env.ANTHROPIC_DEFAULT_OPUS_MODEL   = "claude-opus-4-8"
     | .env.ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-sonnet-4-6"
     | .env.ANTHROPIC_DEFAULT_HAIKU_MODEL  = "claude-haiku-4-5"
-    | .availableModels = ["claude-haiku-4-5", "claude-opus-4-8", "claude-sonnet-4-6"]
     | del(.env.CLAUDE_CODE_USE_BEDROCK,
           .env.CLAUDE_CODE_USE_MANTLE,
+          .env.CLAUDE_CODE_ENABLE_AUTO_MODE,
           .env.ANTHROPIC_BEDROCK_SERVICE_TIER,
-          .modelOverrides)
+          .env.API_FORCE_IDLE_TIMEOUT,
+          .env.CLAUDE_ENABLE_BYTE_WATCHDOG_BEDROCK)
     | if $betas == "" then del(.env.ANTHROPIC_BETAS) else .env.ANTHROPIC_BETAS = $betas end
     | .env |= (to_entries | sort_by(.key) | from_entries)
   ' "${file}" >"${tmp}"
@@ -266,9 +276,9 @@ _update_platform_credentials() {
   printf 'Settings updated in %s\n' "${file}"
 }
 
-if [[ -n "${use_wsl}" || -n "${use_long_context}" ]] &&
+if [[ -n "${use_wsl}" || -n "${use_no_long_context}" ]] &&
   [[ "${mode}" != "bedrock" && "${mode}" != "platform" ]]; then
-  printf 'Error: --wsl and --long-context are only supported for bedrock and platform modes\n' >&2
+  printf 'Error: --wsl and --no-long-context are only supported for bedrock and platform modes\n' >&2
   exit 1
 fi
 
@@ -315,14 +325,14 @@ personal)
 bedrock)
   _bootstrap_bedrock
   _update_bedrock_credentials "${bedrock}" "${aws_profile}" "${aws_region}" \
-    "${use_wsl:-false}" "${use_long_context:-false}"
+    "${use_wsl:-false}" "${long_context}"
   ln -fns "${bedrock}" "${target}"
   printf 'Switched to bedrock config\n'
   ;;
 platform)
   _bootstrap_platform
   _update_platform_credentials "${platform}" "${aws_profile}" "${aws_region}" \
-    "${use_wsl:-false}" "${use_long_context:-false}" "${workspace_id}"
+    "${use_wsl:-false}" "${long_context}" "${workspace_id}"
   ln -fns "${platform}" "${target}"
   printf 'Switched to Claude Platform on AWS config\n'
   ;;
