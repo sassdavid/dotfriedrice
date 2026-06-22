@@ -25,6 +25,7 @@ export DEFAULT_PACKAGES_BREW=(
   "pwgen"
   "ripgrep"
   "rsync"
+  "sevenzip"
   "shellcheck"
   "shfmt"
   "smartmontools"
