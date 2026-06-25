@@ -34,5 +34,6 @@
   },
   "feedbackSurveyRate": 0,
   "effortLevel": "high",
-  "theme": "dark"
+  "theme": "dark",
+  "tui": "fullscreen"
 }
