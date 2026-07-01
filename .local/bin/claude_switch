@@ -171,7 +171,7 @@ _update_bedrock_credentials() {
     else . end |
     if $mc   then
       (if $lctx then "global.anthropic.claude-opus-4-8[1m]"   else "global.anthropic.claude-opus-4-8"   end) as $opus   |
-      (if $lctx then "global.anthropic.claude-sonnet-4-6[1m]" else "global.anthropic.claude-sonnet-4-6" end) as $sonnet |
+      (if $lctx then "global.anthropic.claude-sonnet-5[1m]" else "global.anthropic.claude-sonnet-5" end) as $sonnet |
       .env.ANTHROPIC_DEFAULT_OPUS_MODEL    = $opus   |
       .env.ANTHROPIC_DEFAULT_SONNET_MODEL  = $sonnet
     else . end
@@ -239,7 +239,7 @@ _update_platform_credentials() {
     | .env.CLAUDE_CODE_USE_ANTHROPIC_AWS = "1"
     | .env.ANTHROPIC_AWS_WORKSPACE_ID = $w
     | .env.ANTHROPIC_DEFAULT_OPUS_MODEL   = "claude-opus-4-8"
-    | .env.ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-sonnet-4-6"
+    | .env.ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-sonnet-5"
     | .env.ANTHROPIC_DEFAULT_HAIKU_MODEL  = "claude-haiku-4-5"
     | del(.env.CLAUDE_CODE_USE_BEDROCK,
           .env.CLAUDE_CODE_USE_MANTLE,
