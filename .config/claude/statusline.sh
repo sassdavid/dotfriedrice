@@ -24,6 +24,10 @@ eval "$(echo "$input" | jq -r '
   @sh "PR_NUMBER=\(.pr.number // "")",
   @sh "PR_URL=\(.pr.url // "")",
   @sh "PR_STATE=\(.pr.review_state // "")",
+  @sh "REPO_OWNER=\(.workspace.repo.owner // "")",
+  @sh "REPO_NAME=\(.workspace.repo.name // "")",
+  @sh "AGENT_NAME=\(.agent.name // "")",
+  @sh "WORKTREE_NAME=\(.worktree.name // "")",
   @sh "COST_NONZERO=\(if (.cost.total_cost_usd // 0) > 0 then 1 else 0 end)"
 ')"
 
@@ -34,6 +38,25 @@ YELLOW='\033[33m'
 RED='\033[31m'
 DIM='\033[2m'
 RESET='\033[0m'
+
+# --- Terminal width awareness ---
+# Claude Code captures our stdout, so tput/COLUMNS-from-tty won't work; it
+# sets the COLUMNS env var instead (CC >= 2.1.153). Fall back to 80 on older
+# versions. Long directory/session names are clipped so a single segment
+# can't blow out the whole line on narrow terminals.
+COLS=${COLUMNS:-80}
+
+DIRNAME="${CURRENT_DIR##*/}"
+MAX_DIR_LEN=$((COLS / 3))
+if [ "$MAX_DIR_LEN" -ge 4 ] && [ "${#DIRNAME}" -gt "$MAX_DIR_LEN" ]; then
+  DIRNAME="${DIRNAME:0:$((MAX_DIR_LEN - 1))}…"
+fi
+
+SESSION_DISPLAY="$SESSION_NAME"
+MAX_SESSION_LEN=$((COLS / 4))
+if [ -n "$SESSION_DISPLAY" ] && [ "$MAX_SESSION_LEN" -ge 4 ] && [ "${#SESSION_DISPLAY}" -gt "$MAX_SESSION_LEN" ]; then
+  SESSION_DISPLAY="${SESSION_DISPLAY:0:$((MAX_SESSION_LEN - 1))}…"
+fi
 
 # --- Git info with cache (refreshes every 5s, scoped per session) ---
 
@@ -61,12 +84,16 @@ IFS='|' read -r BRANCH STAGED MODIFIED <"$CACHE_FILE"
 
 GIT_INFO=""
 if [ -n "$BRANCH" ]; then
-  GIT_INFO=" | ${DIM}${BRANCH}${RESET}"
+  # Prefix with owner/repo when known, so same-named clones/forks/worktrees
+  # of different repos aren't ambiguous at a glance.
+  REPO_LABEL="$BRANCH"
+  [ -n "$REPO_OWNER" ] && [ -n "$REPO_NAME" ] && REPO_LABEL="${REPO_OWNER}/${REPO_NAME}:${BRANCH}"
+  GIT_INFO=" | ${DIM}${REPO_LABEL}${RESET}"
   [ "$STAGED" -gt 0 ] && GIT_INFO="${GIT_INFO} ${GREEN}+${STAGED}${RESET}"
   [ "$MODIFIED" -gt 0 ] && GIT_INFO="${GIT_INFO} ${YELLOW}~${MODIFIED}${RESET}"
 fi
 
-# --- Line 1: model [· effort], session name, directory, git, PR ---
+# --- Line 1: model [· effort], session name, agent, directory, git, worktree, PR ---
 
 MODEL_DISPLAY="${CYAN}[${MODEL}"
 [ -n "$EFFORT_LEVEL" ] && MODEL_DISPLAY="${MODEL_DISPLAY} · ${EFFORT_LEVEL}"
@@ -74,7 +101,16 @@ MODEL_DISPLAY="${MODEL_DISPLAY}]${RESET}"
 
 # Custom session name (set via --name or /rename); absent otherwise
 SESSION_LABEL=""
-[ -n "$SESSION_NAME" ] && SESSION_LABEL=" ${DIM}‹${SESSION_NAME}›${RESET}"
+[ -n "$SESSION_DISPLAY" ] && SESSION_LABEL=" ${DIM}‹${SESSION_DISPLAY}›${RESET}"
+
+# Agent badge: only present when running via --agent or agent settings
+AGENT_INFO=""
+[ -n "$AGENT_NAME" ] && AGENT_INFO=" ${DIM}⚙${AGENT_NAME}${RESET}"
+
+# Worktree badge: only present during --worktree sessions (Claude Code's
+# own worktree feature, distinct from a plain `git worktree add` checkout)
+WORKTREE_INFO=""
+[ -n "$WORKTREE_NAME" ] && WORKTREE_INFO=" ${DIM}⎇${WORKTREE_NAME}${RESET}"
 
 # PR badge: Claude Code populates .pr via the gh CLI, so this lights up on
 # GitHub repos only. On Bitbucket the field is absent and nothing is shown.
@@ -107,7 +143,10 @@ if [ -n "$PR_NUMBER" ]; then
   PR_INFO=" ${DIM}|${RESET} ${PR_COLOR}${PR_LINK} ${PR_ICON}${RESET}"
 fi
 
-echo -e "${MODEL_DISPLAY}${SESSION_LABEL} ${CURRENT_DIR##*/}${GIT_INFO}${PR_INFO}"
+# printf '%b' interprets backslash escapes (ANSI colors, OSC 8 links) more
+# reliably across shells than `echo -e`; matters here since PR_INFO carries
+# a hyperlink escape sequence.
+printf '%b\n' "${MODEL_DISPLAY}${SESSION_LABEL}${AGENT_INFO} ${DIRNAME}${GIT_INFO}${WORKTREE_INFO}${PR_INFO}"
 
 # --- Line 2: context progress bar, cost, duration, api duration, code changes ---
 
@@ -163,7 +202,7 @@ if [ "$LINES_ADDED" -gt 0 ] || [ "$LINES_REMOVED" -gt 0 ]; then
   LINE2="${LINE2} ${DIM}|${RESET} ${GREEN}+${LINES_ADDED}${RESET}/${RED}-${LINES_REMOVED}${RESET}"
 fi
 
-echo -e "$LINE2"
+printf '%b\n' "$LINE2"
 
 # --- Line 3: rate limits (Claude.ai subscription only; absent on Bedrock/Vertex) ---
 
@@ -201,5 +240,5 @@ if [ -n "$RATE_5H_PCT" ] || [ -n "$RATE_7D_PCT" ]; then
     [ -n "$LINE3" ] && LINE3="${LINE3} ${DIM}|${RESET} ${PART_7D}" || LINE3="$PART_7D"
   fi
 
-  echo -e "$LINE3"
+  printf '%b\n' "$LINE3"
 fi
