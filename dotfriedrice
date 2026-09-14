@@ -328,6 +328,24 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     CONFIG_INSTALL_ARCH_SKIP=()
   fi
 
+  if [[ "${CONFIG_INSTALL_DEBIAN+x}" ]]; then
+    [ -z "${CONFIG_INSTALL_DEBIAN}" ] && CONFIG_INSTALL_DEBIAN=()
+  else
+    CONFIG_INSTALL_DEBIAN=("${DEFAULT_CONFIG_INSTALL_DEBIAN[@]}")
+  fi
+
+  if [[ "${CONFIG_INSTALL_DEBIAN_EXTRAS+x}" ]]; then
+    [ -z "${CONFIG_INSTALL_DEBIAN_EXTRAS}" ] && CONFIG_INSTALL_DEBIAN_EXTRAS=()
+  else
+    CONFIG_INSTALL_DEBIAN_EXTRAS=()
+  fi
+
+  if [[ "${CONFIG_INSTALL_DEBIAN_SKIP+x}" ]]; then
+    [ -z "${CONFIG_INSTALL_DEBIAN_SKIP}" ] && CONFIG_INSTALL_DEBIAN_SKIP=()
+  else
+    CONFIG_INSTALL_DEBIAN_SKIP=()
+  fi
+
   if [[ "${CONFIG_INSTALL_WSL+x}" ]]; then
     [ -z "${CONFIG_INSTALL_WSL}" ] && CONFIG_INSTALL_WSL=()
   else
@@ -1338,6 +1356,7 @@ create_initial_dirs() {
   mkdir -p \
     "${XDG_CONFIG_HOME}/eza" \
     "${XDG_CONFIG_HOME}/k9s/skins" \
+    "${XDG_CONFIG_HOME}/mise/conf.d" \
     "${XDG_DATA_HOME}/zsh/completions" \
     "${HOME}/.aws" \
     "${HOME}/.claude"
@@ -1452,11 +1471,13 @@ install_configs() {
   local config_install=()
   local config_install_gui_linux=()
   local config_install_arch=()
+  local config_install_debian=()
   local config_install_wsl=()
 
   _skip_install_configs "CONFIG_INSTALL" "CONFIG_INSTALL_SKIP"
   _skip_install_configs "CONFIG_INSTALL_GUI_LINUX" "CONFIG_INSTALL_GUI_LINUX_SKIP"
   _skip_install_configs "CONFIG_INSTALL_ARCH" "CONFIG_INSTALL_ARCH_SKIP"
+  _skip_install_configs "CONFIG_INSTALL_DEBIAN" "CONFIG_INSTALL_DEBIAN_SKIP"
   _skip_install_configs "CONFIG_INSTALL_WSL" "CONFIG_INSTALL_WSL_SKIP"
 
   ((${#CONFIG_INSTALL[@]} > 0)) && config_install+=("${CONFIG_INSTALL[@]}")
@@ -1467,6 +1488,9 @@ install_configs() {
 
   ((${#CONFIG_INSTALL_ARCH[@]} > 0)) && config_install_arch+=("${CONFIG_INSTALL_ARCH[@]}")
   ((${#CONFIG_INSTALL_ARCH_EXTRAS[@]} > 0)) && config_install_arch+=("${CONFIG_INSTALL_ARCH_EXTRAS[@]}")
+
+  ((${#CONFIG_INSTALL_DEBIAN[@]} > 0)) && config_install_debian+=("${CONFIG_INSTALL_DEBIAN[@]}")
+  ((${#CONFIG_INSTALL_DEBIAN_EXTRAS[@]} > 0)) && config_install_debian+=("${CONFIG_INSTALL_DEBIAN_EXTRAS[@]}")
 
   ((${#CONFIG_INSTALL_WSL[@]} > 0)) && config_install_wsl+=("${CONFIG_INSTALL_WSL[@]}")
   ((${#CONFIG_INSTALL_WSL_EXTRAS[@]} > 0)) && config_install_wsl+=("${CONFIG_INSTALL_WSL_EXTRAS[@]}")
@@ -1509,6 +1533,13 @@ install_configs() {
     _config_install_display "Configs (Arch)" "${config_install_arch[@]}"
   fi
 
+  # OS_DISTRO is the normalised value ("debian" for every Debian/Ubuntu
+  # derivative), OS_DISTRO_LIKE is the raw ID_LIKE and can be "ubuntu" on Mint
+  # or Pop!_OS. Match what _install_packages_debian uses.
+  if [ "${OS_DISTRO}" == "debian" ]; then
+    _config_install_display "Configs (Debian)" "${config_install_debian[@]}"
+  fi
+
   # Nested helper function.
   _activate_configs() {
     # Avoid using ln -T flag since it doesn't exist on macOS. We're being
@@ -1521,6 +1552,7 @@ install_configs() {
     [ "${GUI_ENABLED}" == "1" ] && _config_install "${config_install_gui_linux[@]}"
     [ "${OS_IN_WSL}" == "1" ] && _config_install "%WindowsUser" "${windows_user}" "${config_install_wsl[@]}"
     [ "${OS_DISTRO_LIKE}" == "arch" ] && _config_install "${config_install_arch[@]}"
+    [ "${OS_DISTRO}" == "debian" ] && _config_install "${config_install_debian[@]}"
 
     return 0
   }
@@ -2735,17 +2767,12 @@ install_mise() {
       eval "$("${HOME}/.local/bin/mise" activate "$shell_name" --shims)"
     fi
   fi
+}
 
-  mise settings exec_auto_install=false
-  mise settings experimental=true
-  mise settings fetch_remote_versions_timeout=60s
-  mise settings http_timeout=60s
-  mise settings idiomatic_version_file=false
-  mise settings minimum_release_age=0s
-  mise settings not_found_auto_install=false
-  mise settings python.compile=false
-  mise settings task.run_auto_install=false
-  mise settings use_versions_host=false
+install_mise_tools() {
+  _info "INSTALL MISE TOOLS"
+
+  mise install
 }
 
 install_mongodb_tools() {
@@ -3042,6 +3069,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   install_programming_languages
   install_mongodb_tools
   install_configs
+  install_mise_tools
   install_fonts
   install_gui_themes
   install_zsh_plugins

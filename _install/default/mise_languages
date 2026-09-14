@@ -4,7 +4,7 @@
 # shellcheck disable=SC2034
 declare -A DEFAULT_MISE_LANGUAGES
 
-DEFAULT_MISE_LANGUAGES["node"]="node@24"
+DEFAULT_MISE_LANGUAGES["node"]="node@26"
 DEFAULT_MISE_LANGUAGES["python"]="python@3.14"
 DEFAULT_MISE_LANGUAGES["go"]="go@latest"
 DEFAULT_MISE_LANGUAGES["java"]="java@corretto-17"

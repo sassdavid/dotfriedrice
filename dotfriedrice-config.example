@@ -227,6 +227,11 @@ export CONFIG_INSTALL_ARCH=()
 export CONFIG_INSTALL_ARCH_EXTRAS=()
 export CONFIG_INSTALL_ARCH_SKIP=()
 
+# Configs defined here only get created when on Debian / Ubuntu.
+export CONFIG_INSTALL_DEBIAN=()
+export CONFIG_INSTALL_DEBIAN_EXTRAS=()
+export CONFIG_INSTALL_DEBIAN_SKIP=()
+
 # Configs defined here only get created when in WSL.
 export CONFIG_INSTALL_WSL=()
 export CONFIG_INSTALL_WSL_EXTRAS=()
