@@ -22,6 +22,9 @@
     "pr": "",
     "sessionUrl": false
   },
+  "permissions": {
+    "defaultMode": "auto"
+  },
   "enabledMcpjsonServers": [
     "terraform"
   ],

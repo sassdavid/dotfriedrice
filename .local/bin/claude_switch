@@ -46,16 +46,23 @@ models_table="${dotfriedrice_claude}/models.json"
 # follow it to stay byte-stable across an in-app /model or /config change. Existing
 # keys keep their position; this only places keys the script adds. Read out of the
 # schema key table in the Claude Code binary (2.1.245).
+#
+# enabledMcpjsonServers is absent from that table. Its slot below is where 2.1.272
+# put it when it rewrote settings_personal.json after an in-app /model change:
+# after permissions and before deniedMcpServers. Same method for any key added
+# later, since the binary no longer yields the table to strings(1) and the
+# schemastore schema orders properties differently from the binary.
 # shellcheck disable=SC2016  # "$schema" is a JSON key, not a shell expansion
 settings_key_order='[
   "$schema", "apiKeyHelper", "proxyAuthHelper", "awsCredentialExport",
   "awsAuthRefresh", "gcpAuthRefresh", "processWrapper", "env", "attribution",
   "includeCoAuthoredBy", "includeGitInstructions", "permissions", "model",
-  "fallbackModel", "availableModels", "modelOverrides", "deniedMcpServers",
-  "hooks", "disableAllHooks", "statusLine", "subagentStatusLine",
-  "enabledPlugins", "extraKnownMarketplaces", "skipWebFetchPreflight",
-  "sandbox", "feedbackSurveyRate", "promptCacheTtl", "subagentPromptCacheTtl",
-  "alwaysThinkingEnabled", "effortLevel", "autoCompactWindow", "tui", "theme"
+  "fallbackModel", "availableModels", "modelOverrides", "enabledMcpjsonServers",
+  "deniedMcpServers", "hooks", "disableAllHooks", "statusLine",
+  "subagentStatusLine", "enabledPlugins", "extraKnownMarketplaces",
+  "skipWebFetchPreflight", "sandbox", "feedbackSurveyRate", "promptCacheTtl",
+  "subagentPromptCacheTtl", "alwaysThinkingEnabled", "effortLevel",
+  "autoCompactWindow", "tui", "theme"
 ]'
 
 # Opts out of every Anthropic-bound non-inference transmission, re-asserted each
