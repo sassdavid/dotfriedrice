@@ -26,6 +26,7 @@ tags
 .config/**/*.local
 .config/git/config.local.*
 .config/nvim/lua/plugins/theme.lua
+.config/vpn-connect/profiles.conf
 .config/zsh/.zsh_history*
 .local/bin/local/
 etc/pacman.d/02-ignore.conf.example

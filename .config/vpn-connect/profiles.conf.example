@@ -1,0 +1,108 @@
+# vpn-connect profiles.
+#
+# Copy this file to profiles.conf in the same directory and fill in your own values:
+#
+#   cp profiles.conf.example "${XDG_CONFIG_HOME:-$HOME/.config}/vpn-connect/profiles.conf"
+#
+# profiles.conf is gitignored on purpose: endpoint IDs, account names and connection names
+# are environment-specific and must not be committed. Override the location with the
+# VPN_CONNECT_CONFIG environment variable.
+#
+# The file is parsed literally -- it is never sourced or eval'd -- so only `key = value`
+# lines inside a `[profile]` section are read. `#` and `;` start a comment.
+#
+# Keys
+# ----
+#   kind          viscosity (default) | aws-clientvpn
+#   connection    Required. The connection name as Viscosity shows it. For aws-clientvpn
+#                 this is also the name `--sync` gives the imported connection.
+#   auth          op-dialog (default for viscosity) | web (default for aws-clientvpn) | none
+#                   op-dialog  Fetch credentials from 1Password and type them into
+#                              Viscosity's credential dialog via Accessibility.
+#                   web        Viscosity handles authentication itself (AWS SAML browser
+#                              flow). Nothing is typed.
+#                   none       No interactive authentication (client certificate only).
+#   timeout       Seconds to wait for the connection. Default 30. Raise it well above that
+#                 for `web`, which waits on a browser login.
+#
+# Keys for auth = op-dialog
+#   op-item       Required. 1Password item title holding the credentials and TOTP.
+#   op-vault      Vault to search. Recommended: without it `op` searches every vault, which
+#                 is slower and ambiguous when item titles repeat.
+#   op-account    Account to use, when several are signed in.
+#   otp-mode      append (default) | challenge | none
+#                   append     Concatenate the TOTP onto the password in one field. Use when
+#                              the server expects password+OTP in a single prompt.
+#                   challenge  Type the TOTP into a separate third field. Use when the
+#                              config carries `static-challenge`.
+#                   none       Do not fetch a TOTP at all.
+#
+# Keys for kind = aws-clientvpn
+#   aws-profile   Required. AWS CLI profile name.
+#   aws-region    Required. Region the Client VPN endpoint lives in.
+#
+#   Then either pin one endpoint:
+#   endpoint-id   The cvpn-endpoint-... id. Use this or endpoint-tag.
+#   endpoint-tag  KEY=VALUE tag to resolve the endpoint by, so the id can change without
+#                 editing this file. Must match exactly one available endpoint.
+#                 Pinned profiles also need `connection`.
+#
+#   ...or cover every endpoint in that account and region at once:
+#   name-template A pattern with {TagKey} placeholders that names each endpoint from its
+#                 own tags. "{Project}-{Stack}" names an endpoint tagged Project=acme,
+#                 Stack=dev3 as "acme-dev3". Endpoints missing a referenced tag are
+#                 skipped. Cannot be combined with endpoint-id/endpoint-tag or connection.
+#
+#                 `vpn --discover` shows what a template resolves to. The resulting name is
+#                 used directly: `vpn --sync acme-dev3`, then `vpn acme-dev3`.
+#
+#                 If two endpoints expand to the same name, pin one of them in its own
+#                 section with endpoint-id/endpoint-tag plus an explicit connection name.
+#                 A pinned endpoint drops out of template discovery, which makes the
+#                 remaining name unambiguous again.
+
+# The first profile is the default, used when `vpn` is run with no argument.
+[work]
+kind       = viscosity
+connection = Corp-VPN-Split
+auth       = op-dialog
+op-item    = Corp VPN
+op-vault   = Private
+otp-mode   = append
+timeout    = 30
+
+[work-full]
+kind       = viscosity
+connection = Corp-VPN-Full
+auth       = op-dialog
+op-item    = Corp VPN
+op-vault   = Private
+otp-mode   = append
+
+# AWS Client VPN using SAML single sign-on, covering every endpoint in this account and
+# region. Endpoints tagged Project=acme with Stack=dev2/dev3 become the connection names
+# "acme-dev2" and "acme-dev3":
+#
+#   vpn --discover            see what is available and what it would be called
+#   vpn --sync acme-dev3      import it into Viscosity
+#   vpn acme-dev3             connect
+#
+[acme-dev]
+kind          = aws-clientvpn
+aws-profile   = my-aws-profile
+aws-region    = eu-west-1
+name-template = {Project}-{Stack}
+auth          = web
+timeout       = 180
+
+# A single pinned endpoint. Use this when you want one specific endpoint under a name of
+# your choosing -- including to break a tie when two endpoints would expand to the same
+# template name, since a pinned endpoint is excluded from discovery.
+[acme-prod]
+kind        = aws-clientvpn
+aws-profile = my-aws-prod-profile
+aws-region  = eu-west-1
+endpoint-id = cvpn-endpoint-0123456789abcdef0
+connection  = acme-prod
+auth        = web
+timeout     = 180
