@@ -16,9 +16,9 @@
 #USAGE flag "--discover" help="List AWS Client VPN endpoints and the names they would import as, optionally limited to profiles starting with <target>"
 #USAGE flag "-l --list" help="List the configured profiles"
 #USAGE flag "--all" requires="--down" help="With --down, disconnect every connection"
-#USAGE flag "--complete-targets" hide=#true help="Print tab-completion candidates"
+#USAGE flag "--complete-targets" hide=#true help="Print tab-completion candidates" { arg "<mode>"; }
 #USAGE group "action" "--status" "--down" "--sync" "--discover" "--list" "--complete-targets"
-#USAGE complete "target" run="vpn-connect --complete-targets"
+#USAGE complete "target" run="vpn-connect --complete-targets {% if '--down' in words or '-d' in words %}active{% elif '--sync' in words or '--discover' in words %}any{% else %}one{% endif %}"
 #USAGE example "vpn-connect" header="Connect using the first profile"
 #USAGE example "vpn-connect work-full" header="Connect using a named profile"
 #USAGE example "vpn-connect acme-dev3" header="Connect using a template-derived connection name"
@@ -1029,6 +1029,9 @@ discover() {
 }
 
 connect_profile() {
+  [[ -n "${PROFILE_CONNECTION}" ]] ||
+    die "[${PROFILE_NAME}] uses name-template and covers several connections; name one of them, or run: ${0##*/} --discover ${PROFILE_NAME}"
+
   require_viscosity
   load_snapshot || return 1
 
@@ -1167,14 +1170,49 @@ status() {
   done <<<"${SNAPSHOT}"
 }
 
-# Candidates for `vpn <Tab>`: profile names plus the connections Viscosity already has.
-# AWS endpoints that have not been synced yet are deliberately left out, since listing
-# them would mean an AWS call on every keystroke. Use --discover for those.
+# Candidates for `vpn <Tab>`, always the connections Viscosity already has plus whichever
+# profiles the action can act on. AWS endpoints that have not been synced yet are left out
+# deliberately, since listing them would mean an AWS call on every keystroke: use --discover.
+#
+# How many endpoints a profile stands for decides whether it is a target at all, and the
+# spec's completer passes the mode:
+#   any     --sync and --discover, which take a profile covering any number of endpoints
+#   one     everything else, which acts on a single connection, so a name-template profile
+#           standing for many is not a target and only crowds the list
+#   active  --down, which can only act on a tunnel that is up. Connecting and Authenticating
+#           count: cancelling one that is still coming up is a fair --down
 complete_targets() {
-  list_profiles
+  local -r mode="${1}"
+
+  case "${mode}" in
+  any) list_profiles ;;
+  one) profile_connections | cut -f2 ;;
+  active) : ;;
+  *) die "Internal error: unhandled completion mode '${mode}'" ;;
+  esac
+
   pgrep -x Viscosity >/dev/null 2>&1 || return 0
   load_snapshot 2>/dev/null || return 0
-  printf '%s\n' "${SNAPSHOT}" | cut -f1
+
+  if [[ "${mode}" != active ]]; then
+    printf '%s\n' "${SNAPSHOT}" | cut -f1
+    return 0
+  fi
+
+  # Each live connection is offered beside the profile that owns it, because resolve_target
+  # takes either name.
+  local -A owner_of=()
+  local conn prof
+  while IFS=$'\t' read -r conn prof; do
+    [[ -z "${conn}" ]] || owner_of["${conn}"]="${prof}"
+  done < <(profile_connections)
+
+  local name state time
+  while IFS=$'\t' read -r name state time; do
+    [[ -n "${name}" && "${state}" != "Disconnected" ]] || continue
+    printf '%s\n' "${name}"
+    [[ -z "${owner_of[${name}]:-}" ]] || printf '%s\n' "${owner_of[${name}]}"
+  done <<<"${SNAPSHOT}"
 }
 
 # --- main --------------------------------------------------------------------------------
@@ -1183,9 +1221,9 @@ main() {
   local target="${usage_target:-}"
   local action="connect"
 
-  if [[ "${usage_complete_targets:-}" == "true" ]]; then
+  if [[ -n "${usage_complete_targets:-}" ]]; then
     require_config
-    complete_targets
+    complete_targets "${usage_complete_targets}"
     return 0
   fi
 
