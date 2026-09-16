@@ -1,57 +1,55 @@
-#!/usr/bin/env bash
-# Control Viscosity VPN connections from the command line.
-#
-# Supports two kinds of connection, selected per profile:
-#
-#   kind = viscosity      A connection already present in Viscosity. Credentials and a live
-#                         TOTP are pulled from 1Password and typed into Viscosity's credential
-#                         dialog via macOS Accessibility.
-#   kind = aws-clientvpn  An AWS Client VPN endpoint. `--sync` downloads the endpoint's
-#                         configuration from AWS and imports it into Viscosity as a named
-#                         connection. Authentication is handled by Viscosity itself (SAML web
-#                         auth, or a client certificate), so no credential typing is involved.
-#
-# All environment-specific values live in a profiles file outside this repository:
-#   ${XDG_CONFIG_HOME:-$HOME/.config}/vpn-connect/profiles.conf
-# See profiles.conf.example for the format. Nothing company-specific belongs in this script.
-#
-# One-time setup for `auth = op-dialog` profiles: grant Accessibility access to your terminal
-# app in System Settings -> Privacy & Security -> Accessibility.
-#
-# Requires:
-#   - Viscosity                      (running)
-#   - 1Password CLI (brew install 1password-cli)   for auth = op-dialog
-#   - jq            (brew install jq)              for auth = op-dialog
-#   - AWS CLI v2    (brew install awscli)          for kind = aws-clientvpn
-#
-# An aws-clientvpn profile can cover many endpoints at once: set name-template to build each
-# connection name from the endpoint's tags, e.g. "{Project}-{Stack}" names an endpoint tagged
-# Project=acme, Stack=dev3 as "acme-dev3". That name is then usable directly as a target.
-#
-# Examples:
-#   vpn                     Connect using the first profile in the profiles file
-#   vpn work-full           Connect using the named profile
-#   vpn acme-dev3           Connect using a template-derived connection name
-#   vpn --status            Show the state of every Viscosity connection
-#   vpn --down work-full    Disconnect one profile
-#   vpn --down --all        Disconnect every Viscosity connection
-#   vpn --discover          List AWS endpoints and the names they would import as
-#   vpn --sync acme-dev3    Download that endpoint's config and import it into Viscosity
-#   vpn --list              List configured profiles
+#!/usr/bin/env -S usage bash
+# Requires: usage CLI  https://github.com/jdx/usage
+#   Install: mise use -g usage   |   cargo install usage-cli
+# shellcheck shell=bash
+# shellcheck enable=add-default-case,avoid-negated-conditions,avoid-nullary-conditions,check-unassigned-uppercase,deprecate-which,quote-safe-variables,require-double-brackets,require-variable-braces,useless-use-of-cat
+
+#USAGE name "vpn-connect"
+#USAGE bin "vpn-connect"
+#USAGE about "Control Viscosity VPN connections, including AWS Client VPN endpoints."
+#USAGE long_about "macOS only, and Viscosity must be running.\n\nEvery environment-specific value lives in ~/.config/vpn-connect/profiles.conf, outside the dotfiles repo. See profiles.conf.example for the format, or point VPN_CONNECT_CONFIG somewhere else.\n\nA 'kind = viscosity' profile drives a connection Viscosity already has. Its credentials and a live TOTP come from 1Password and are typed into the credential dialog through macOS Accessibility, which your terminal needs access to under System Settings > Privacy & Security > Accessibility.\n\nA 'kind = aws-clientvpn' profile describes an AWS Client VPN endpoint. --sync downloads its configuration and imports it into Viscosity under a name you control, and Viscosity then handles authentication itself, whether SAML in the browser or a client certificate, so nothing is typed.\n\nOne aws-clientvpn profile can cover many endpoints: set name-template to build each connection name from the endpoint's own tags, and a newly created endpoint needs no config change. --discover shows what a template resolves to.\n\nRequires bash >= 5.0, plus jq and op for 1Password profiles and the AWS CLI for aws-clientvpn profiles."
+#USAGE unknown_flags "error"
+#USAGE arg "[target]" help="Profile name, or a connection name Viscosity already has. Defaults to the first profile. With --discover, a profile name prefix."
+#USAGE flag "-s --status" help="Show the state of every Viscosity connection"
+#USAGE flag "-d --down" help="Disconnect <target>, or every connection with --all"
+#USAGE flag "--sync" help="Download an AWS Client VPN configuration and import it into Viscosity"
+#USAGE flag "--discover" help="List AWS Client VPN endpoints and the names they would import as, optionally limited to profiles starting with <target>"
+#USAGE flag "-l --list" help="List the configured profiles"
+#USAGE flag "--all" requires="--down" help="With --down, disconnect every connection"
+#USAGE flag "--complete-targets" hide=#true help="Print tab-completion candidates"
+#USAGE group "action" "--status" "--down" "--sync" "--discover" "--list" "--complete-targets"
+#USAGE complete "target" run="vpn-connect --complete-targets"
+#USAGE example "vpn-connect" header="Connect using the first profile"
+#USAGE example "vpn-connect work-full" header="Connect using a named profile"
+#USAGE example "vpn-connect acme-dev3" header="Connect using a template-derived connection name"
+#USAGE example "vpn-connect --status" header="Show the state of every connection"
+#USAGE example "vpn-connect --down work-full" header="Disconnect one profile, leaving the others up"
+#USAGE example "vpn-connect --down --all" header="Disconnect everything"
+#USAGE example "vpn-connect --discover" header="List AWS endpoints and the names they would import as"
+#USAGE example "vpn-connect --discover acme" header="List only the endpoints of profiles starting with acme"
+#USAGE example "vpn-connect --sync acme-dev3" header="Import one AWS endpoint into Viscosity"
+
+# No plain comments inside the #USAGE block: usage stops collecting at the first
+# non-#USAGE line and silently drops the rest.
 
 set -o errexit
 set -o pipefail
 set -o nounset
+# Without this, errexit does not apply inside $( ), so a function that fails there runs on
+# and reports a misleading second error instead of the first one.
+shopt -s inherit_errexit
+
+if ((BASH_VERSINFO[0] < 5)); then
+  printf 'vpn-connect: requires bash >= 5.0, found %s\n' "${BASH_VERSION}" >&2
+  exit 1
+fi
 
 readonly DEFAULT_TIMEOUT=30
-# Browser-based SAML sign-in waits on a person, so it needs far longer than a password login.
 readonly WEB_AUTH_TIMEOUT=180
-# Viscosity imports a bundle asynchronously after `open` hands it over.
 readonly IMPORT_TIMEOUT=30
 CONFIG_FILE="${VPN_CONNECT_CONFIG:-${XDG_CONFIG_HOME:-${HOME}/.config}/vpn-connect/profiles.conf}"
 readonly CONFIG_FILE
 
-# Populated by load_profile().
 PROFILE_NAME=""
 PROFILE_KIND=""
 PROFILE_CONNECTION=""
@@ -67,8 +65,9 @@ PROFILE_ENDPOINT_TAG=""
 PROFILE_NAME_TEMPLATE=""
 PROFILE_TIMEOUT=""
 
-# Colors are only emitted to a terminal, and never when NO_COLOR is set, so that redirected
-# or piped output stays clean.
+SNAPSHOT=""
+SNAPSHOT_LOADED=false
+
 if [[ -t 2 && -z "${NO_COLOR:-}" ]]; then
   readonly C_GREEN=$'\033[0;32m'
   readonly C_RED=$'\033[0;31m'
@@ -87,49 +86,45 @@ die() {
   exit "${2:-1}"
 }
 
-usage() {
-  cat <<EOF
-Usage: ${0##*/} [TARGET]
-       ${0##*/} --status [PROFILE]
-       ${0##*/} --down [PROFILE | --all]
-       ${0##*/} --sync TARGET
-       ${0##*/} --discover
-       ${0##*/} --list
+# Removed by the single EXIT trap main installs. make_tmpdir assigns instead of printing:
+# called as $(make_tmpdir) the append would land in a subshell and be lost.
+TMPDIRS=()
+TMPDIR_LAST=""
 
-TARGET is either a profile name from the profiles file, or a connection name derived
-from an aws-clientvpn profile's name-template (see --discover).
+make_tmpdir() {
+  TMPDIR_LAST=$(mktemp -d) || die "Could not create a temporary directory"
+  TMPDIRS+=("${TMPDIR_LAST}")
+}
 
-Actions:
-    (none)          Connect using TARGET, or the first profile if omitted
-    -s, --status    Show connection state; all profiles when PROFILE is omitted
-    -d, --down      Disconnect PROFILE, or every connection with --all
-        --sync      Download an AWS Client VPN config and import it into Viscosity
-        --discover  List AWS Client VPN endpoints and the names they would import as
-    -l, --list      List the configured profiles
-    -h, --help      Show this help message
+cleanup() {
+  ((${#TMPDIRS[@]} == 0)) || rm -rf "${TMPDIRS[@]}"
+}
 
-Profiles are read from:
-    ${CONFIG_FILE}
-
-Override the location with the VPN_CONNECT_CONFIG environment variable.
-EOF
+require_macos() {
+  [[ "${OSTYPE}" == darwin* ]] ||
+    die "vpn-connect only runs on macOS: Viscosity and osascript are macOS-only."
 }
 
 require_command() {
   command -v "${1}" >/dev/null 2>&1 ||
-    die "${1} not found. Install with: ${2}"
+    die "Required command not found in PATH: ${1}"
 }
 
 require_viscosity() {
   pgrep -x Viscosity >/dev/null 2>&1 ||
-    die "Viscosity is not running. Please launch Viscosity first."
+    die "Viscosity is not running. Launch it first."
+}
+
+require_config() {
+  [[ -r "${CONFIG_FILE}" ]] ||
+    die "Profiles file not found: ${CONFIG_FILE}
+Copy profiles.conf.example there and fill in your own values."
 }
 
 # --- profiles file -----------------------------------------------------------------------
 
-# Emits "key<TAB>value" for one section, or every "section<TAB>key<TAB>value" when no section
-# is given. Values are read literally: the file is never sourced or eval'd, so a malformed
-# line cannot execute anything.
+# Emits "key<TAB>value" for one section, or "section<TAB>key<TAB>value" for all of them.
+# The file is read literally and never sourced, so a malformed line cannot execute.
 parse_config() {
   local -r want="${1:-}"
   awk -v want="${want}" '
@@ -143,7 +138,7 @@ parse_config() {
     }
     {
       line = $0
-      sub(/[[:space:]]*[#;].*$/, "", line)          # strip trailing comment
+      sub(/[[:space:]]*[#;].*$/, "", line)
       if (index(line, "=") == 0) next
       key = substr(line, 1, index(line, "=") - 1)
       val = substr(line, index(line, "=") + 1)
@@ -167,22 +162,29 @@ list_profiles() {
   ' "${CONFIG_FILE}"
 }
 
-require_config() {
-  [[ -r "${CONFIG_FILE}" ]] ||
-    die "Profiles file not found: ${CONFIG_FILE}
-Copy profiles.conf.example there and fill in your own values."
+is_profile() {
+  list_profiles | grep -qxF -- "${1}"
+}
+
+# "connection<TAB>profile" for profiles that name exactly one connection. Reading the file
+# directly avoids running load_profile's validation over unrelated sections.
+profile_connections() {
+  parse_config | awk -F'\t' '$2 == "connection" && $3 != "" { print $3 "\t" $1 }'
 }
 
 load_profile() {
   local name="${1:-}"
 
   if [[ -z "${name}" ]]; then
-    name=$(list_profiles | head -n 1)
+    # Taking the first line without `head` keeps the producer from being closed early,
+    # which pipefail would otherwise turn into a failure.
+    name=$(list_profiles)
+    name="${name%%$'\n'*}"
     [[ -n "${name}" ]] || die "No profiles defined in ${CONFIG_FILE}"
   fi
 
-  list_profiles | grep -qxF "${name}" ||
-    die "Unknown profile: '${name}'. Known profiles: $(list_profiles | paste -sd' ' -)"
+  is_profile "${name}" ||
+    die "Unknown profile: '${name}'. Run '${0##*/} --list' to see them."
 
   PROFILE_NAME="${name}"
   PROFILE_KIND="viscosity"
@@ -226,8 +228,6 @@ load_profile() {
   aws-clientvpn)
     [[ -n "${PROFILE_AWS_PROFILE}" ]] || die "[${name}] aws-clientvpn requires: aws-profile"
     [[ -n "${PROFILE_AWS_REGION}" ]] || die "[${name}] aws-clientvpn requires: aws-region"
-    # A profile either pins one endpoint (connection + endpoint-id/endpoint-tag) or discovers
-    # many, naming each from its tags via name-template.
     if [[ -n "${PROFILE_NAME_TEMPLATE}" ]]; then
       [[ -z "${PROFILE_ENDPOINT_ID}${PROFILE_ENDPOINT_TAG}" ]] ||
         die "[${name}] name-template discovers endpoints, so it cannot be combined with endpoint-id or endpoint-tag"
@@ -237,17 +237,20 @@ load_profile() {
       [[ -n "${PROFILE_ENDPOINT_ID}${PROFILE_ENDPOINT_TAG}" ]] ||
         die "[${name}] aws-clientvpn requires one of: endpoint-id, endpoint-tag, name-template"
     fi
-    [[ -z "${PROFILE_AUTH}" ]] && PROFILE_AUTH="web"
+    [[ -n "${PROFILE_AUTH}" ]] || PROFILE_AUTH="web"
     ;;
   *) die "[${name}] unknown kind: '${PROFILE_KIND}' (expected viscosity or aws-clientvpn)" ;;
   esac
 
-  [[ -z "${PROFILE_AUTH}" ]] && PROFILE_AUTH="op-dialog"
+  [[ -n "${PROFILE_AUTH}" ]] || PROFILE_AUTH="op-dialog"
 
   case "${PROFILE_AUTH}" in
   op-dialog)
-    [[ -n "${PROFILE_OP_ITEM}" ]] ||
-      die "[${name}] auth = op-dialog requires: op-item"
+    [[ -n "${PROFILE_OP_ITEM}" ]] || die "[${name}] auth = op-dialog requires: op-item"
+    case "${PROFILE_OTP_MODE}" in
+    append | challenge | none) : ;;
+    *) die "[${name}] unknown otp-mode: '${PROFILE_OTP_MODE}' (expected append, challenge or none)" ;;
+    esac
     ;;
   web | none) : ;;
   *) die "[${name}] unknown auth: '${PROFILE_AUTH}' (expected op-dialog, web or none)" ;;
@@ -259,11 +262,18 @@ load_profile() {
 
 # --- Viscosity ---------------------------------------------------------------------------
 
-# Emits "name<TAB>state<TAB>timeConnected" for every connection.
-#
-# Viscosity does not support `connection "NAME"` by name (it raises -10002), so this fetches
-# the three property lists in three Apple Events and joins them in AppleScript rather than
-# walking `connections` and paying an Apple Event per property.
+report_applescript_error() {
+  log_error "${1}"
+  printf '%s\n' "${2}" >&2
+  if [[ "${2}" == *"-1743"* || "${2}" == *"not allowed"* ]]; then
+    log_error "Grant your terminal app Automation access to Viscosity in"
+    log_error "System Settings > Privacy & Security > Automation."
+  fi
+}
+
+# "name<TAB>state<TAB>timeConnected" for every connection. Viscosity rejects
+# `connection "NAME"` with -10002, and walking `connections` costs an Apple Event per
+# property, so this fetches three property lists and joins them in AppleScript.
 viscosity_snapshot() {
   local out status=0
   out=$(
@@ -273,86 +283,92 @@ tell application "Viscosity"
   set theStates to state of every connection
   set theTimes to timeConnected of every connection
 end tell
-set rows to {}
+set outText to ""
 repeat with i from 1 to (count of theNames)
-  set end of rows to ((item i of theNames) & tab & (item i of theStates) & tab & (item i of theTimes))
+  if i > 1 then set outText to outText & linefeed
+  set outText to outText & (item i of theNames) & tab & (item i of theStates) & tab & (item i of theTimes)
 end repeat
-set AppleScript's text item delimiters to linefeed
-return rows as text
+return outText
 APPLESCRIPT
   ) || status=$?
 
-  if ((status != 0)); then
-    log_error "Could not query Viscosity via AppleScript:"
-    printf '%s\n' "${out}" >&2
-    if [[ "${out}" == *"-1743"* || "${out}" == *"not allowed"* ]]; then
-      log_error "Grant your terminal app Automation access to Viscosity in"
-      log_error "System Settings -> Privacy & Security -> Automation."
-    fi
+  ((status == 0)) || {
+    report_applescript_error "Could not query Viscosity:" "${out}"
     return 1
-  fi
-
+  }
   printf '%s\n' "${out}"
+}
+
+# Queries Viscosity once per run. connection_state and connection_time read the cached
+# result, so a command substitution around them cannot lose the error or the cache.
+load_snapshot() {
+  [[ "${SNAPSHOT_LOADED}" != true ]] || return 0
+  SNAPSHOT=$(viscosity_snapshot) || return 1
+  SNAPSHOT_LOADED=true
 }
 
 # Prints the state of one connection, or "Missing" when Viscosity does not know the name.
 connection_state() {
   local -r conn="${1}"
-  local -r snapshot="${2}"
   local name state rest
   while IFS=$'\t' read -r name state rest; do
     if [[ "${name}" == "${conn}" ]]; then
       printf '%s' "${state}"
       return 0
     fi
-  done <<<"${snapshot}"
+  done <<<"${SNAPSHOT}"
   printf 'Missing'
 }
 
 connection_time() {
   local -r conn="${1}"
-  local -r snapshot="${2}"
   local name state time
   while IFS=$'\t' read -r name state time; do
     if [[ "${name}" == "${conn}" ]]; then
       printf '%s' "${time}"
       return 0
     fi
-  done <<<"${snapshot}"
+  done <<<"${SNAPSHOT}"
 }
 
-viscosity_connect() {
-  osascript - "${1}" <<'APPLESCRIPT' >/dev/null
-on run argv
-  tell application "Viscosity" to connect (item 1 of argv)
-end run
-APPLESCRIPT
-}
-
-viscosity_disconnect() {
-  osascript - "${1}" <<'APPLESCRIPT' >/dev/null
-on run argv
-  tell application "Viscosity" to disconnect (item 1 of argv)
-end run
-APPLESCRIPT
-}
-
-# Polls inside a single AppleScript so the wait costs one process rather than one per second.
-#
-# Returns "Connected", "Failed" or "Timeout". A connection that reaches Connecting or
-# Authenticating and then falls back to Disconnected has failed, so this reports it
-# immediately instead of waiting out the full timeout.
-wait_for_connected() {
-  local -r conn="${1}"
-  local -r timeout="${2}"
+# verb is connect, disconnect or disconnectall.
+viscosity_command() {
   local out status=0
   out=$(
-    osascript - "${conn}" "${timeout}" <<'APPLESCRIPT' 2>&1
+    osascript - "$@" <<'APPLESCRIPT' 2>&1
+on run argv
+  set theVerb to item 1 of argv
+  tell application "Viscosity"
+    if theVerb is "connect" then
+      connect (item 2 of argv)
+    else if theVerb is "disconnect" then
+      disconnect (item 2 of argv)
+    else
+      disconnectall
+    end if
+  end tell
+end run
+APPLESCRIPT
+  ) || status=$?
+
+  ((status == 0)) || {
+    report_applescript_error "Viscosity rejected '${1}':" "${out}"
+    return 1
+  }
+}
+
+# Polls inside one AppleScript so the wait costs a single process. Prints Connected,
+# Failed or Timeout. Reaching Connecting and then falling back to Disconnected is a
+# failure, reported at once rather than after the full timeout.
+wait_for_connected() {
+  local out status=0
+  out=$(
+    osascript - "${1}" "${2}" <<'APPLESCRIPT' 2>&1
 on run argv
   set connName to item 1 of argv
-  set maxSecs to (item 2 of argv) as integer
+  set deadline to (current date) + ((item 2 of argv) as integer)
   set sawProgress to false
-  repeat maxSecs times
+  repeat
     set theState to "Missing"
     try
       tell application "Viscosity"
@@ -364,40 +380,69 @@ on run argv
     if (theState is not "Disconnected") and (theState is not "Missing") then
       set sawProgress to true
     end if
+    if (current date) > deadline then return "Timeout"
     delay 1
   end repeat
-  return "Timeout"
 end run
 APPLESCRIPT
   ) || status=$?
 
-  if ((status != 0)); then
-    log_error "Could not track the connection state:"
-    printf '%s\n' "${out}" >&2
+  ((status == 0)) || {
+    report_applescript_error "Could not track the connection state:" "${out}"
     return 1
-  fi
+  }
+  printf '%s' "${out}"
+}
 
+wait_for_import() {
+  local out status=0
+  out=$(
+    osascript - "${1}" "${2}" <<'APPLESCRIPT' 2>&1
+on run argv
+  set connName to item 1 of argv
+  set deadline to (current date) + ((item 2 of argv) as integer)
+  repeat
+    try
+      tell application "Viscosity"
+        if (count of (every connection whose name is connName)) > 0 then return "Imported"
+      end tell
+    end try
+    if (current date) > deadline then return "Timeout"
+    delay 1
+  end repeat
+end run
+APPLESCRIPT
+  ) || status=$?
+
+  ((status == 0)) || {
+    report_applescript_error "Could not confirm the import:" "${out}"
+    return 1
+  }
   printf '%s' "${out}"
 }
 
 # --- 1Password ---------------------------------------------------------------------------
 
-# Fetches username and password for the profile's item. Prints them as two lines.
-#
-# Scoping the lookup to a vault (and account, when several are signed in) keeps `op` from
-# searching every vault, which is both slower and ambiguous when item titles repeat.
+OP_ARGS=()
+
+set_op_args() {
+  OP_ARGS=(item get "${PROFILE_OP_ITEM}")
+  [[ -z "${PROFILE_OP_VAULT}" ]] || OP_ARGS+=(--vault "${PROFILE_OP_VAULT}")
+  [[ -z "${PROFILE_OP_ACCOUNT}" ]] || OP_ARGS+=(--account "${PROFILE_OP_ACCOUNT}")
+}
+
+# Prints username and password on two lines. Scoping to a vault keeps op from searching
+# every one, which is slower and ambiguous when item titles repeat.
 fetch_credentials() {
-  local -a op_args=(item get "${PROFILE_OP_ITEM}")
-  [[ -n "${PROFILE_OP_VAULT}" ]] && op_args+=(--vault "${PROFILE_OP_VAULT}")
-  [[ -n "${PROFILE_OP_ACCOUNT}" ]] && op_args+=(--account "${PROFILE_OP_ACCOUNT}")
+  set_op_args
 
   local creds user pass
-  creds=$(op "${op_args[@]}" --fields label=username,label=password --format json --reveal)
+  creds=$(op "${OP_ARGS[@]}" --fields label=username,label=password --format json --reveal)
   user=$(printf '%s' "${creds}" | jq -r '[.[] | select(.label=="username") | .value] | @tsv')
   pass=$(printf '%s' "${creds}" | jq -r '[.[] | select(.label=="password") | .value] | @tsv')
 
-  # @tsv above collapses each match set to one line, so a duplicated label shows up as an
-  # embedded tab rather than silently selecting whichever value jq emitted first.
+  # @tsv collapses each match set to one line, so a duplicated label arrives as an embedded
+  # tab rather than silently picking whichever value jq emitted first.
   [[ -n "${user}" ]] || die "1Password item '${PROFILE_OP_ITEM}' has no 'username' field"
   [[ -n "${pass}" ]] || die "1Password item '${PROFILE_OP_ITEM}' has no 'password' field"
   [[ "${user}" != *$'\t'* ]] || die "1Password item '${PROFILE_OP_ITEM}' has multiple 'username' fields"
@@ -407,34 +452,24 @@ fetch_credentials() {
 }
 
 fetch_otp() {
-  local -a op_args=(item get "${PROFILE_OP_ITEM}")
-  [[ -n "${PROFILE_OP_VAULT}" ]] && op_args+=(--vault "${PROFILE_OP_VAULT}")
-  [[ -n "${PROFILE_OP_ACCOUNT}" ]] && op_args+=(--account "${PROFILE_OP_ACCOUNT}")
+  set_op_args
 
   local otp
-  otp=$(op "${op_args[@]}" --otp)
+  otp=$(op "${OP_ARGS[@]}" --otp)
   [[ -n "${otp}" ]] || die "1Password item '${PROFILE_OP_ITEM}' has no one-time password"
   printf '%s' "${otp}"
 }
 
 # --- credential dialog -------------------------------------------------------------------
 
-# Fills Viscosity's credential dialog via macOS Accessibility.
+# The password field's AXRole is AXTextField, same as the username field: only AXSubrole
+# tells them apart, and the username field has no AXSubrole at all. `role description` works
+# too but is localized. `text fields of window` returns the password field first, so fields
+# are sorted by vertical position to recover username, password, then the challenge field
+# when the profile uses static-challenge.
 #
-# Two things about Viscosity's dialog drive the approach here:
-#
-#   * The password field's AXRole is AXTextField, exactly like the username field. Only
-#     AXSubrole distinguishes it (AXSecureTextField), and the username field has no AXSubrole
-#     attribute at all. `role description` would also work but is localized, so it stops
-#     matching on a non-English system.
-#   * `text fields of window` enumerates the password field *before* the username field, so
-#     fields cannot be filled in enumeration order. They are sorted by vertical position
-#     instead, which yields the visual top-to-bottom order: username, password, then the
-#     challenge field when the profile uses static-challenge.
-#
-# Credentials are passed in the environment rather than on argv. This keeps them out of
-# `ps` output, but note that a process running as the same user can still read another
-# process's environment on macOS -- it is a narrowing, not a guarantee.
+# Credentials go through the environment rather than argv to keep them out of ps output. A
+# same-user process can still read them, so this narrows exposure rather than removing it.
 fill_credentials() {
   local -r user="${1}"
   local -r pass="${2}"
@@ -453,15 +488,14 @@ on run
     tell process "Viscosity"
       set frontmost to true
 
-      -- Wait up to 15s for the credential dialog to appear.
       repeat 30 times
         if (count of windows) > 0 then exit repeat
         delay 0.5
       end repeat
       if (count of windows) is 0 then error "Credential dialog did not appear"
 
-      -- Pick the window holding a secure text field, so an open Preferences window or
-      -- similar does not get mistaken for the credential prompt.
+      -- Pick the window holding a secure text field, so an open Preferences window is
+      -- not mistaken for the credential prompt.
       set theWindow to missing value
       repeat with w in windows
         repeat with tf in text fields of w
@@ -479,7 +513,6 @@ on run
         error "Dialog has " & (count of theFields) & " field(s), expected at least " & (count of theValues)
       end if
 
-      -- Insertion-sort the fields top to bottom; enumeration order is not visual order.
       set sorted to {}
       repeat with tf in theFields
         set y to my fieldY(tf)
@@ -515,7 +548,7 @@ on run
       end repeat
 
       delay 0.3
-      -- Press the default button rather than one matched by title, which is localized.
+      -- The default button rather than one matched by title, which is localized.
       try
         perform action "AXPress" of (value of attribute "AXDefaultButton" of theWindow)
       on error
@@ -525,9 +558,6 @@ on run
   end tell
 end run
 
--- Viscosity's password field reports AXRole "AXTextField" just like the username field, so
--- AXSubrole is the only locale-independent way to tell them apart. Non-secure fields do not
--- carry the attribute at all, which raises an error rather than returning missing value.
 on isSecure(tf)
   try
     tell application "System Events"
@@ -539,7 +569,7 @@ on isSecure(tf)
 end isSecure
 
 -- The position has to land in a variable before it is indexed: inside a `tell` block
--- `item 2 of (position of ...)` is parsed as an object specifier and fails with -1700.
+-- `item 2 of (position of ...)` parses as an object specifier and fails with -1700.
 on fieldY(tf)
   tell application "System Events"
     set p to position of tf
@@ -549,100 +579,129 @@ end fieldY
 APPLESCRIPT
   ) || status=$?
 
-  if ((status != 0)); then
+  ((status == 0)) || {
     log_error "Could not fill the credential dialog:"
     printf '%s\n' "${out}" >&2
     if [[ "${out}" == *"-1719"* || "${out}" == *"-1743"* || "${out}" == *"assistive"* ]]; then
       log_error "Grant your terminal app Accessibility access in"
-      log_error "System Settings -> Privacy & Security -> Accessibility."
+      log_error "System Settings > Privacy & Security > Accessibility."
     fi
     return 1
-  fi
+  }
 }
 
 # --- AWS Client VPN ----------------------------------------------------------------------
 
-aws_ec2() {
-  aws ec2 "$@" \
+# Every endpoint whatever its status; the jq consumers drop only the ones being torn down.
+# pending-associate means no target network is attached, which is a normal resting state:
+# the config still exports, so --sync works, and only connecting needs an association.
+describe_endpoints() {
+  aws ec2 describe-client-vpn-endpoints \
     --profile "${PROFILE_AWS_PROFILE}" \
     --region "${PROFILE_AWS_REGION}" \
-    --output text
+    --output json \
+    --query 'ClientVpnEndpoints[].{Id:ClientVpnEndpointId,Status:Status.Code,Tags:Tags}'
 }
 
-# Expands the loaded profile's name-template against each endpoint's tags, emitting
-# "endpoint_id<TAB>connection_name".
-#
-# A template is a string with {TagKey} placeholders, e.g. "{Project}-{Stack}" turns tags
-# Project=acme, Stack=dev3 into the connection name "acme-dev3". An endpoint
-# missing any referenced tag is skipped, since it cannot be named from the template.
+# Expands a name-template against each endpoint's tags, emitting
+# "endpoint_id<TAB>connection_name<TAB>status". "{Project}-{Stack}" turns tags Project=acme,
+# Stack=dev3 into "acme-dev3". An endpoint missing any referenced tag is skipped.
 expand_endpoint_names() {
-  printf '%s' "${1}" | jq -r --arg tpl "${PROFILE_NAME_TEMPLATE}" '
-    .[]
-    | . as $e
+  printf '%s' "${1}" | jq -r --arg tpl "${2}" '
+    .[] | select(.Status != "deleting" and .Status != "deleted") as $e
     | ([$e.Tags[]? | {(.Key): .Value}] | add // {}) as $tags
-    # Expand every {TagKey} placeholder against this endpoint substituting tags.
-    | ($tpl | [scan("\\{([^}]+)\\}")] | map(.[0])) as $keys
-    | if ($keys | length) == 0 then empty
-      elif any($keys[]; $tags[.] == null or $tags[.] == "") then empty
-      else
-        ($keys | reduce .[] as $k ($tpl; gsub("\\{" + $k + "\\}"; $tags[$k]))) as $name
-        | "\($e.Id)\t\($name)"
+    | [$tpl | scan("\\{([^{}]+)\\}|([^{}]+)")] as $parts
+    | [$parts[] | .[0] | select(. != null)] as $keys
+    | if ($keys | length) == 0 or any($keys[]; ($tags[.] // "") == "") then empty
+      else "\($e.Id)\t\([$parts[] | if .[0] != null then $tags[.[0]] else .[1] end] | join(""))\t\($e.Status)"
       end
   '
 }
 
-# Resolves a pinned profile's endpoint id locally, without a second AWS call, by matching
-# endpoint-id or endpoint-tag against an already-fetched endpoint list.
-pinned_endpoint_id() {
-  local -r raw="${1}"
-  if [[ -n "${PROFILE_ENDPOINT_ID}" ]]; then
-    printf '%s' "${PROFILE_ENDPOINT_ID}"
-    return 0
-  fi
-  local -r tag_key="${PROFILE_ENDPOINT_TAG%%=*}"
-  local -r tag_value="${PROFILE_ENDPOINT_TAG#*=}"
-  printf '%s' "${raw}" | jq -r --arg k "${tag_key}" --arg v "${tag_value}" '
-    .[] | select(any(.Tags[]?; .Key == $k and .Value == $v)) | .Id
-  ' | head -n 1
+# "endpoint_id<TAB>status" for every endpoint in an already-fetched list carrying KEY=VALUE.
+endpoints_by_tag() {
+  printf '%s' "${1}" | jq -r --arg k "${2%%=*}" --arg v "${2#*=}" '
+    .[]
+    | select(.Status != "deleting" and .Status != "deleted")
+    | select(any(.Tags[]?; .Key == $k and .Value == $v))
+    | "\(.Id)\t\(.Status)"
+  '
 }
 
-# Prints "profile<TAB>endpoint_id<TAB>connection_name<TAB>origin" for everything that can be
-# synced, where origin is "pinned" or "template".
+# Sets ENDPOINT_MAP to "profile<TAB>endpoint_id<TAB>connection_name<TAB>origin<TAB>status"
+# rows for everything syncable, where origin is pinned or template. An optional prefix limits
+# which profiles are queried, so `--discover acme` does not wake every account.
 #
-# Pinned profiles claim their endpoint, which removes it from template-based discovery. That
-# is the escape hatch when two endpoints would otherwise expand to the same name: pin one of
-# them to an explicit connection name and the other stops being ambiguous.
-build_endpoint_map() {
-  local rows="" claimed=""
-  local profile raw id name
+# Assigns rather than prints: under $( ) the temp dir would be registered in a subshell and
+# the parent would leak it.
+#
+# A pinned profile claims its endpoint, dropping it from template discovery. That is the
+# escape hatch when two endpoints expand to the same name.
+ENDPOINT_MAP=""
+ENDPOINT_MAP_QUERIED=0
 
+build_endpoint_map() {
+  local -r filter="${1:-}"
+
+  make_tmpdir
+  local -r dir="${TMPDIR_LAST}"
+
+  local -A tpl_of=() conn_of=() tag_of=() eid_of=()
+  local -a pids=() queried=()
+  local profile
+
+  # All accounts are queried at once: each call costs a second or more, so in sequence this
+  # would be half a minute rather than three. Output files are named by array index, which
+  # keeps a profile name out of the path.
   while read -r profile; do
+    [[ -z "${filter}" || "${profile}" == "${filter}"* ]] || continue
     load_profile "${profile}"
     [[ "${PROFILE_KIND}" == "aws-clientvpn" ]] || continue
 
-    # shellcheck disable=SC2016 # backticks are JMESPath literal syntax, not command substitution
-    raw=$(aws ec2 describe-client-vpn-endpoints \
-      --profile "${PROFILE_AWS_PROFILE}" \
-      --region "${PROFILE_AWS_REGION}" \
-      --output json \
-      --query 'ClientVpnEndpoints[?Status.Code==`available`].{Id:ClientVpnEndpointId,Tags:Tags}')
+    tpl_of["${profile}"]="${PROFILE_NAME_TEMPLATE}"
+    conn_of["${profile}"]="${PROFILE_CONNECTION}"
+    tag_of["${profile}"]="${PROFILE_ENDPOINT_TAG}"
+    eid_of["${profile}"]="${PROFILE_ENDPOINT_ID}"
 
-    if [[ -n "${PROFILE_NAME_TEMPLATE}" ]]; then
-      while IFS=$'\t' read -r id name; do
-        [[ -n "${id}" ]] || continue
-        rows+="${profile}"$'\t'"${id}"$'\t'"${name}"$'\t'"template"$'\n'
-      done < <(expand_endpoint_names "${raw}")
-    else
-      id=$(pinned_endpoint_id "${raw}")
-      [[ -n "${id}" ]] || id="<unresolved>"
-      rows+="${profile}"$'\t'"${id}"$'\t'"${PROFILE_CONNECTION}"$'\t'"pinned"$'\n'
-      claimed+="${id}"$'\n'
-    fi
+    describe_endpoints >"${dir}/${#queried[@]}.json" 2>"${dir}/${#queried[@]}.err" &
+    pids+=("$!")
+    queried+=("${profile}")
   done < <(list_profiles)
 
-  # Drop template rows for endpoints a pinned profile already owns. The claim list is passed
-  # through the environment because `awk -v` cannot carry embedded newlines.
-  printf '%s' "${rows}" | VPN_CLAIMED="${claimed}" awk -F'\t' '
+  ENDPOINT_MAP_QUERIED="${#queried[@]}"
+
+  local i
+  for i in "${!pids[@]}"; do
+    wait "${pids[i]}" || {
+      log_warn "[${queried[i]}] could not list endpoints:"
+      cat "${dir}/${i}.err" >&2
+    }
+  done
+
+  local rows="" claimed="" raw id name status
+  for i in "${!queried[@]}"; do
+    profile="${queried[i]}"
+    raw=$(<"${dir}/${i}.json")
+    [[ -n "${raw}" ]] || continue
+
+    if [[ -n "${tpl_of[${profile}]}" ]]; then
+      while IFS=$'\t' read -r id name status; do
+        [[ -n "${id}" ]] || continue
+        rows+="${profile}"$'\t'"${id}"$'\t'"${name}"$'\t'"template"$'\t'"${status}"$'\n'
+      done < <(expand_endpoint_names "${raw}" "${tpl_of[${profile}]}")
+    else
+      id="${eid_of[${profile}]}"
+      status=""
+      [[ -n "${id}" ]] ||
+        IFS=$'\t' read -r id status < <(endpoints_by_tag "${raw}" "${tag_of[${profile}]}") || true
+      [[ -n "${id}" ]] || id="<unresolved>"
+      rows+="${profile}"$'\t'"${id}"$'\t'"${conn_of[${profile}]}"$'\t'"pinned"$'\t'"${status}"$'\n'
+      claimed+="${id}"$'\n'
+    fi
+  done
+
+  # The claim list goes through the environment because awk -v cannot carry newlines.
+  ENDPOINT_MAP=$(printf '%s' "${rows}" | VPN_CLAIMED="${claimed}" awk -F'\t' '
     BEGIN {
       n = split(ENVIRON["VPN_CLAIMED"], a, "\n")
       for (i = 1; i <= n; i++) if (a[i] != "") owned[a[i]] = 1
@@ -650,14 +709,18 @@ build_endpoint_map() {
     NF == 0 { next }
     $4 == "template" && ($2 in owned) { next }
     { print }
-  '
+  ')
 }
 
+# Sets ENDPOINT_ID, and ENDPOINT_STATUS when it is known. A pinned endpoint-id is taken at
+# face value so the common case costs no AWS call.
+ENDPOINT_ID=""
+ENDPOINT_STATUS=""
+
 resolve_endpoint_id() {
-  if [[ -n "${PROFILE_ENDPOINT_ID}" ]]; then
-    printf '%s' "${PROFILE_ENDPOINT_ID}"
-    return 0
-  fi
+  ENDPOINT_ID="${PROFILE_ENDPOINT_ID}"
+  ENDPOINT_STATUS=""
+  [[ -z "${ENDPOINT_ID}" ]] || return 0
 
   local tag_key="${PROFILE_ENDPOINT_TAG%%=*}"
   local tag_value="${PROFILE_ENDPOINT_TAG#*=}"
@@ -665,32 +728,58 @@ resolve_endpoint_id() {
     die "[${PROFILE_NAME}] endpoint-tag must be KEY=VALUE, got: '${PROFILE_ENDPOINT_TAG}'"
 
   log_info "Resolving endpoint by tag ${tag_key}=${tag_value} in ${PROFILE_AWS_REGION}..."
-  local ids
-  # shellcheck disable=SC2016 # backticks are JMESPath literal syntax, not command substitution
-  ids=$(aws_ec2 describe-client-vpn-endpoints \
-    --filters "Name=tag:${tag_key},Values=${tag_value}" \
-    --query 'ClientVpnEndpoints[?Status.Code==`available`].ClientVpnEndpointId')
+  local raw
+  raw=$(describe_endpoints)
 
   local -a matches=()
-  # shellcheck disable=SC2206 # deliberate word splitting: aws --output text returns a tab-separated row
-  matches=(${ids})
+  local line
+  while IFS= read -r line; do
+    [[ -n "${line}" ]] && matches+=("${line}")
+  done < <(endpoints_by_tag "${raw}" "${PROFILE_ENDPOINT_TAG}")
 
   case "${#matches[@]}" in
-  0) die "No available Client VPN endpoint tagged ${tag_key}=${tag_value} in ${PROFILE_AWS_REGION}" ;;
-  1) printf '%s' "${matches[0]}" ;;
-  *) die "Tag ${tag_key}=${tag_value} matches ${#matches[@]} endpoints: ${matches[*]}. Use endpoint-id instead." ;;
+  0) die "No Client VPN endpoint tagged ${tag_key}=${tag_value} in ${PROFILE_AWS_REGION}" ;;
+  1) IFS=$'\t' read -r ENDPOINT_ID ENDPOINT_STATUS <<<"${matches[0]}" ;;
+  *) die "Tag ${tag_key}=${tag_value} matches ${#matches[@]} endpoints: ${matches[*]%%$'\t'*}. Use endpoint-id instead." ;;
   esac
 }
 
-# Builds a .visc bundle from an exported AWS Client VPN configuration.
+# Route 53 private zones attached to an endpoint's VPC, one per line, trailing dot stripped.
 #
-# A bundle is used rather than the raw .ovpn because Viscosity names an imported .ovpn after
-# the endpoint's region ("AWS Client VPN - eu-west-1"), which collides as soon as two
-# endpoints share a region. A bundle's config.conf carries `#viscosity name`, so the
-# connection name is whatever the profile says it is.
+# AWS can push DNS servers but has no way to push a search domain. Without one Viscosity
+# scopes the VPN resolver to a placeholder domain ("utun10.viscosity") and macOS never sends
+# it a real query, so private-zone names stay unresolvable while the tunnel is up.
+#
+# Zones owned by a service (EKS, EFS) are internal plumbing and only add noise.
+endpoint_search_domains() {
+  local vpc names
+  vpc=$(aws ec2 describe-client-vpn-endpoints \
+    --profile "${PROFILE_AWS_PROFILE}" \
+    --region "${PROFILE_AWS_REGION}" \
+    --client-vpn-endpoint-ids "${1}" \
+    --output text \
+    --query 'ClientVpnEndpoints[0].VpcId')
+  [[ -n "${vpc}" && "${vpc}" != "None" ]] || return 0
+
+  names=$(aws route53 list-hosted-zones-by-vpc \
+    --profile "${PROFILE_AWS_PROFILE}" \
+    --region us-east-1 \
+    --vpc-id "${vpc}" \
+    --vpc-region "${PROFILE_AWS_REGION}" \
+    --output text \
+    --query 'HostedZoneSummaries[?!not_null(Owner.OwningService)].Name')
+  [[ -n "${names}" && "${names}" != "None" ]] || return 0
+
+  printf '%s\n' "${names}" | tr '\t' '\n' | sed 's/\.$//'
+}
+
+# A bundle rather than the raw .ovpn because Viscosity names an imported .ovpn after the
+# endpoint's region ("AWS Client VPN - eu-west-1"), which collides as soon as two endpoints
+# share a region. A bundle's config.conf carries `#viscosity name`, so the name is ours.
 build_visc_bundle() {
   local -r raw="${1}"
   local -r bundle="${2}"
+  local -r domains="${3:-}"
 
   mkdir -p "${bundle}"
 
@@ -703,12 +792,14 @@ build_visc_bundle() {
     printf '#viscosity name %s\n' "${PROFILE_CONNECTION}"
     printf '#viscosity protocol openvpn\n'
     if grep -q '^auth-federate' "${raw}"; then
-      # Viscosity's own name for the AWS SAML browser flow. This is what it writes when it
-      # imports an `auth-federate` config itself.
+      # Viscosity's own name for the AWS SAML browser flow, and what it writes when it
+      # imports an auth-federate config itself.
       printf '#viscosity web-authentication-custom aws\n'
     fi
-    # Replace the inline <ca> block with a reference to the extracted file, and drop
-    # auth-federate now that it is expressed as a #viscosity directive.
+    local domain
+    while read -r domain; do
+      [[ -z "${domain}" ]] || printf 'dhcp-option DOMAIN-SEARCH %s\n' "${domain}"
+    done <<<"${domains}"
     awk '
       /^<ca>/      { inside = 1; print "ca ca.crt"; next }
       /^<\/ca>/    { inside = 0; next }
@@ -720,76 +811,87 @@ build_visc_bundle() {
 }
 
 sync_profile() {
-  local -r known_endpoint_id="${1:-}"
+  local endpoint_id="${1:-}"
+  local endpoint_status="${2:-}"
 
   [[ "${PROFILE_KIND}" == "aws-clientvpn" ]] ||
     die "[${PROFILE_NAME}] --sync only applies to kind = aws-clientvpn"
 
-  require_command aws "brew install awscli"
-  require_viscosity
+  [[ -n "${PROFILE_CONNECTION}" ]] ||
+    die "[${PROFILE_NAME}] uses name-template and covers several endpoints; name one of them, or run: ${0##*/} --discover ${PROFILE_NAME}"
 
-  local snapshot
-  snapshot=$(viscosity_snapshot) || return 1
-  if [[ "$(connection_state "${PROFILE_CONNECTION}" "${snapshot}")" != "Missing" ]]; then
+  require_command aws
+  require_viscosity
+  load_snapshot || return 1
+
+  if [[ "$(connection_state "${PROFILE_CONNECTION}")" != "Missing" ]]; then
     log_error "Viscosity already has a connection named '${PROFILE_CONNECTION}'."
     log_error "Re-importing would create a duplicate rather than replace it."
-    log_error "Delete it first: Viscosity -> Preferences -> Connections, then re-run --sync."
+    log_error "Delete it first in Viscosity > Preferences > Connections, then re-run --sync."
     return 1
   fi
 
-  local endpoint_id="${known_endpoint_id}"
-  [[ -n "${endpoint_id}" ]] || endpoint_id=$(resolve_endpoint_id)
+  if [[ -z "${endpoint_id}" ]]; then
+    resolve_endpoint_id
+    endpoint_id="${ENDPOINT_ID}"
+    endpoint_status="${ENDPOINT_STATUS}"
+  fi
 
-  local work
-  work=$(mktemp -d) || die "Could not create a temporary directory"
-  # The bundle holds no secrets for SAML endpoints, but a mutual-auth export would, so the
-  # working directory is removed on every exit path.
-  # shellcheck disable=SC2064 # expand work now: the path must survive into the trap
-  trap "rm -rf '${work}'" EXIT
+  # A SAML bundle holds no secrets but a mutual-auth export would, so it is removed on exit.
+  make_tmpdir
+  local -r work="${TMPDIR_LAST}"
 
   log_info "Exporting configuration for ${endpoint_id}..."
   (
     umask 077
-    aws_ec2 export-client-vpn-client-configuration --client-vpn-endpoint-id "${endpoint_id}"
+    aws ec2 export-client-vpn-client-configuration \
+      --profile "${PROFILE_AWS_PROFILE}" \
+      --region "${PROFILE_AWS_REGION}" \
+      --output text \
+      --client-vpn-endpoint-id "${endpoint_id}"
   ) >"${work}/raw.ovpn"
   [[ -s "${work}/raw.ovpn" ]] || die "AWS returned an empty configuration for ${endpoint_id}"
+
+  # Non-fatal: a connection without search domains still works, it just cannot resolve the
+  # VPC's private zones.
+  local domains=""
+  domains=$(endpoint_search_domains "${endpoint_id}") ||
+    log_warn "Could not list Route 53 zones for the endpoint's VPC; importing without a DNS search domain."
+  if [[ -n "${domains}" ]]; then
+    log_info "DNS search domains: ${domains//$'\n'/ }"
+  else
+    log_warn "The VPC has no private hosted zone, so no DNS search domain is set."
+  fi
 
   local bundle="${work}/${PROFILE_CONNECTION}.visc"
   (
     umask 077
-    build_visc_bundle "${work}/raw.ovpn" "${bundle}"
+    build_visc_bundle "${work}/raw.ovpn" "${bundle}" "${domains}"
   )
 
   log_info "Importing '${PROFILE_CONNECTION}' into Viscosity..."
-  log_info "Viscosity will show a 'Connection Imported' notice -- it is informational, dismiss it."
+  log_info "Viscosity shows a 'Connection Imported' notice afterwards. It is informational."
   open -a Viscosity "${bundle}"
 
-  # Viscosity registers the connection before that notice is dismissed, so this only waits for
-  # the import itself -- which must finish before the trap removes the source bundle.
-  local i=0
-  while ((i < IMPORT_TIMEOUT)); do
-    snapshot=$(viscosity_snapshot) || return 1
-    if [[ "$(connection_state "${PROFILE_CONNECTION}" "${snapshot}")" != "Missing" ]]; then
-      # Suggest the connection name, not the profile name: for a template-discovered endpoint
-      # the profile covers many endpoints and is not what you connect to.
-      log_info "Imported '${PROFILE_CONNECTION}'. Connect with: ${0##*/} ${PROFILE_CONNECTION}"
-      return 0
-    fi
-    sleep 1
-    i=$((i + 1))
-  done
+  # Viscosity registers the connection before the notice is dismissed, so this waits only
+  # for the import, which must finish before cleanup removes the source bundle.
+  local imported
+  imported=$(wait_for_import "${PROFILE_CONNECTION}" "${IMPORT_TIMEOUT}")
+  [[ "${imported}" == "Imported" ]] ||
+    die "Viscosity did not register '${PROFILE_CONNECTION}' within ${IMPORT_TIMEOUT}s."
 
-  die "Viscosity did not register '${PROFILE_CONNECTION}' within ${IMPORT_TIMEOUT}s. Was the import prompt dismissed?"
+  # The connection name, not the profile name: a template profile covers many endpoints
+  # and is not itself something you connect to.
+  log_info "Imported '${PROFILE_CONNECTION}'. Connect with: ${0##*/} ${PROFILE_CONNECTION}"
+
+  [[ "${endpoint_status}" != "pending-associate" ]] ||
+    log_warn "${endpoint_id} has no target network associated, so connecting fails until one is."
 }
 
 # --- target resolution -------------------------------------------------------------------
 
-is_profile() {
-  list_profiles | grep -qxF "${1}"
-}
-
-# Reads a connection's stored OpenVPN config to work out how it authenticates. This keeps
-# `vpn <discovered-name>` working without a profile section or an AWS round-trip.
+# Reads a connection's stored config to work out how it authenticates, so that
+# `vpn <discovered-name>` works without a profile section or an AWS round-trip.
 viscosity_connection_auth() {
   local -r conn="${1}"
   local dir config name
@@ -808,10 +910,10 @@ viscosity_connection_auth() {
   printf 'none'
 }
 
-# Accepts either a profile section name or the name of a connection already in Viscosity.
-# The latter is what makes `vpn acme-dev3` work for a template-discovered endpoint
-# that has no section of its own.
-resolve_connect_target() {
+# Accepts a profile section name or the name of a connection Viscosity already has. The
+# latter is what makes `vpn acme-dev3` work for a template-discovered endpoint with no
+# section of its own.
+resolve_target() {
   local -r target="${1:-}"
 
   if [[ -z "${target}" ]] || is_profile "${target}"; then
@@ -820,26 +922,27 @@ resolve_connect_target() {
   fi
 
   require_viscosity
-  local snapshot
-  snapshot=$(viscosity_snapshot) || return 1
-
-  if [[ "$(connection_state "${target}" "${snapshot}")" == "Missing" ]]; then
+  load_snapshot || return 1
+  if [[ "$(connection_state "${target}")" == "Missing" ]]; then
     log_error "No profile or Viscosity connection named '${target}'."
-    log_error "Profiles: $(list_profiles | paste -sd' ' -)"
+    log_error "Run '${0##*/} --list' for the profiles, or '${0##*/} --status' for the connections."
     log_error "If it is an AWS endpoint, import it first: ${0##*/} --sync ${target}"
     return 1
   fi
 
-  # Synthesise a profile for a connection Viscosity already knows about.
   PROFILE_NAME="${target}"
   PROFILE_KIND="viscosity"
   PROFILE_CONNECTION="${target}"
   PROFILE_AUTH=$(viscosity_connection_auth "${target}")
   PROFILE_OTP_MODE="none"
-  PROFILE_TIMEOUT="${WEB_AUTH_TIMEOUT}"
+  if [[ "${PROFILE_AUTH}" == "web" ]]; then
+    PROFILE_TIMEOUT="${WEB_AUTH_TIMEOUT}"
+  else
+    PROFILE_TIMEOUT="${DEFAULT_TIMEOUT}"
+  fi
 }
 
-# Accepts a profile section name, or a connection name produced by a profile's name-template.
+# Accepts a profile section name, or a connection name a profile's name-template produces.
 resolve_sync_target() {
   local -r target="${1}"
 
@@ -849,12 +952,12 @@ resolve_sync_target() {
     return
   fi
 
-  require_command aws "brew install awscli"
-  require_command jq "brew install jq"
+  require_command aws
+  require_command jq
   log_info "Looking up '${target}' across AWS Client VPN profiles..."
 
-  local map
-  map=$(build_endpoint_map)
+  build_endpoint_map
+  local -r map="${ENDPOINT_MAP}"
 
   local -a hits=()
   local line
@@ -874,55 +977,63 @@ resolve_sync_target() {
     log_error "'${target}' matches ${#hits[@]} endpoints:"
     printf '%s\n' "${hits[@]}" | awk -F'\t' '{ printf "    %s  (profile %s)\n", $2, $1 }' >&2
     log_error "Use a more specific name-template, or pin one of them to its own profile"
-    log_error "section with endpoint-id plus connection -- a pinned endpoint drops out of"
-    log_error "template discovery, which makes the other name unambiguous again."
+    log_error "section with endpoint-id plus connection, which drops it from discovery and"
+    log_error "makes the other name unambiguous."
     return 1
     ;;
   esac
 
-  local hit_profile hit_id hit_name
-  IFS=$'\t' read -r hit_profile hit_id hit_name _ <<<"${hits[0]}"
+  # _ absorbs the origin column; declared local so read does not write the global.
+  local hit_profile hit_id hit_name hit_status _
+  IFS=$'\t' read -r hit_profile hit_id hit_name _ hit_status <<<"${hits[0]}"
 
   load_profile "${hit_profile}"
   PROFILE_CONNECTION="${hit_name}"
-  sync_profile "${hit_id}"
-}
-
-discover() {
-  require_command aws "brew install awscli"
-  require_command jq "brew install jq"
-  require_viscosity
-
-  local snapshot
-  snapshot=$(viscosity_snapshot) || return 1
-
-  local map
-  map=$(build_endpoint_map)
-  [[ -n "${map}" ]] || {
-    log_warn "No aws-clientvpn profiles defined in ${CONFIG_FILE}"
-    return 0
-  }
-
-  printf '%-32s %-30s %-10s %s\n' "CONNECTION" "PROFILE" "ORIGIN" "IMPORTED"
-  local profile id name origin state
-  while IFS=$'\t' read -r profile id name origin; do
-    [[ -n "${name}" ]] || continue
-    state=$(connection_state "${name}" "${snapshot}")
-    printf '%-32s %-30s %-10s %s\n' "${name}" "${profile}" "${origin}" \
-      "$([[ "${state}" == "Missing" ]] && printf 'no' || printf 'yes')"
-  done <<<"${map}"
+  sync_profile "${hit_id}" "${hit_status}"
 }
 
 # --- actions -----------------------------------------------------------------------------
 
+discover() {
+  local -r filter="${1:-}"
+
+  require_command aws
+  require_command jq
+  require_viscosity
+  load_snapshot || return 1
+
+  build_endpoint_map "${filter}"
+  local -r map="${ENDPOINT_MAP}"
+  [[ -n "${map}" ]] || {
+    if ((ENDPOINT_MAP_QUERIED > 0)); then
+      # Distinguishes an empty account from a failed query: an expired AWS session fails
+      # every profile at once, and pointing at the config file would be misleading.
+      log_warn "None of the ${ENDPOINT_MAP_QUERIED} queried profile(s) returned an endpoint."
+      log_warn "If there are errors above, refresh your AWS session and retry."
+    elif [[ -n "${filter}" ]]; then
+      log_warn "No aws-clientvpn profile starts with '${filter}'. Run '${0##*/} --list' to see them."
+    else
+      log_warn "No aws-clientvpn profiles defined in ${CONFIG_FILE}"
+    fi
+    return 0
+  }
+
+  printf '%-30s %-20s %-9s %-18s %s\n' "CONNECTION" "PROFILE" "ORIGIN" "STATUS" "IMPORTED"
+  local profile id name origin status state
+  while IFS=$'\t' read -r profile id name origin status; do
+    [[ -n "${name}" ]] || continue
+    state=$(connection_state "${name}")
+    printf '%-30s %-20s %-9s %-18s %s\n' "${name}" "${profile}" "${origin}" "${status:--}" \
+      "$([[ "${state}" == "Missing" ]] && printf 'no' || printf 'yes')"
+  done <<<"${map}"
+}
+
 connect_profile() {
   require_viscosity
-
-  local snapshot
-  snapshot=$(viscosity_snapshot) || return 1
+  load_snapshot || return 1
 
   local state
-  state=$(connection_state "${PROFILE_CONNECTION}" "${snapshot}")
+  state=$(connection_state "${PROFILE_CONNECTION}")
 
   case "${state}" in
   Connected)
@@ -930,36 +1041,34 @@ connect_profile() {
     return 0
     ;;
   Missing)
-    if [[ "${PROFILE_KIND}" == "aws-clientvpn" ]]; then
+    [[ "${PROFILE_KIND}" != "aws-clientvpn" ]] ||
       die "Viscosity has no connection named '${PROFILE_CONNECTION}'. Import it with: ${0##*/} --sync ${PROFILE_NAME}"
-    fi
     die "Viscosity has no connection named '${PROFILE_CONNECTION}'."
     ;;
-  *)
-    # Disconnected, or already Connecting/Authenticating: carry on and let Viscosity settle it.
-    :
-    ;;
+  *) : ;;
   esac
 
-  local user="" pass="" otp=""
+  local user="" pass="" otp="" creds=""
   if [[ "${PROFILE_AUTH}" == "op-dialog" ]]; then
-    require_command op "brew install 1password-cli"
-    require_command jq "brew install jq"
+    require_command op
+    require_command jq
 
     log_info "Fetching credentials from 1Password..."
+    creds=$(fetch_credentials)
     {
       read -r user
       read -r pass
-    } < <(fetch_credentials)
+    } <<<"${creds}"
+    creds=""
   fi
 
   log_info "Connecting to '${PROFILE_CONNECTION}'..."
-  viscosity_connect "${PROFILE_CONNECTION}"
+  viscosity_command connect "${PROFILE_CONNECTION}"
 
   if [[ "${PROFILE_AUTH}" == "op-dialog" ]]; then
     if [[ "${PROFILE_OTP_MODE}" != "none" ]]; then
-      # Fetched after the connection is triggered: TOTP codes rotate every 30s, so fetching
-      # earlier risks the code expiring while the dialog is still appearing.
+      # Fetched after the connection is triggered: TOTP codes rotate every 30s, so an
+      # earlier fetch risks expiring while the dialog is still appearing.
       log_info "Fetching one-time password from 1Password..."
       otp=$(fetch_otp)
     fi
@@ -969,11 +1078,13 @@ connect_profile() {
     append) fill_credentials "${user}" "${pass}${otp}" ;;
     challenge) fill_credentials "${user}" "${pass}" "${otp}" ;;
     none) fill_credentials "${user}" "${pass}" ;;
-    *) die "[${PROFILE_NAME}] unknown otp-mode: '${PROFILE_OTP_MODE}' (expected append, challenge or none)" ;;
+    *) die "[${PROFILE_NAME}] unknown otp-mode: '${PROFILE_OTP_MODE}'" ;;
     esac
     user="" pass="" otp=""
   elif [[ "${PROFILE_AUTH}" == "web" ]]; then
-    log_info "Viscosity is handling authentication in your browser..."
+    # A cached SAML session connects straight through; otherwise Viscosity asks to open
+    # the browser and waits for the sign-in, which is why the timeout is minutes not seconds.
+    log_info "Viscosity handles authentication itself. Watch for a browser prompt."
   fi
 
   log_info "Waiting for connection (up to ${PROFILE_TIMEOUT}s)..."
@@ -988,162 +1099,133 @@ connect_profile() {
 }
 
 down_profile() {
+  [[ -n "${PROFILE_CONNECTION}" ]] ||
+    die "[${PROFILE_NAME}] uses name-template and covers several connections; name one of them, or use --down --all"
+
   require_viscosity
-  viscosity_disconnect "${PROFILE_CONNECTION}"
-  log_info "Disconnected '${PROFILE_CONNECTION}'."
+  load_snapshot || return 1
+
+  local state
+  state=$(connection_state "${PROFILE_CONNECTION}")
+  case "${state}" in
+  Missing) die "Viscosity has no connection named '${PROFILE_CONNECTION}'." ;;
+  Disconnected) log_info "'${PROFILE_CONNECTION}' is already disconnected." ;;
+  *)
+    viscosity_command disconnect "${PROFILE_CONNECTION}"
+    log_info "Disconnected '${PROFILE_CONNECTION}'."
+    ;;
+  esac
 }
 
 down_all() {
   require_viscosity
-  osascript -e 'tell application "Viscosity" to disconnectall' >/dev/null
+  viscosity_command disconnectall
   log_info "All VPN connections disconnected."
 }
 
-status_line() {
-  local -r conn="${1}"
-  local -r owner="${2}"
-  local -r snapshot="${3}"
-  local state time detail
-  state=$(connection_state "${conn}" "${snapshot}")
-  detail="${state}"
-  if [[ "${state}" == "Connected" ]]; then
-    time=$(connection_time "${conn}" "${snapshot}")
-    [[ -n "${time}" ]] && detail="Connected (${time})"
-  fi
-  printf '%-32s %-24s %s\n' "${conn}" "${owner}" "${detail}"
-}
-
 # Lists what Viscosity actually has rather than iterating profiles, because a profile using
-# name-template stands for many connections and knowing which ones would cost an AWS call.
-# Connections imported by --sync therefore show up here without one.
+# name-template stands for many connections and knowing which would cost an AWS call.
 status() {
   local -r only="${1:-}"
   require_viscosity
-
-  local snapshot
-  snapshot=$(viscosity_snapshot) || return 1
+  load_snapshot || return 1
 
   if [[ -n "${only}" ]]; then
+    local conn="${only}" owner="-"
     if is_profile "${only}"; then
       load_profile "${only}"
       [[ -n "${PROFILE_CONNECTION}" ]] ||
         die "[${only}] uses name-template and covers several connections; run --discover, or name one of them"
-      status_line "${PROFILE_CONNECTION}" "${only}" "${snapshot}"
-    else
-      status_line "${only}" "-" "${snapshot}"
+      conn="${PROFILE_CONNECTION}"
+      owner="${only}"
     fi
+    local state detail time
+    state=$(connection_state "${conn}")
+    detail="${state}"
+    if [[ "${state}" == "Connected" ]]; then
+      time=$(connection_time "${conn}")
+      [[ -z "${time}" ]] || detail="Connected (${time})"
+    fi
+    printf '%-32s %-24s %s\n' "${conn}" "${owner}" "${detail}"
     return 0
   fi
 
-  # Map connection name -> owning profile, for profiles that name exactly one connection.
-  local owners="" profile
-  while read -r profile; do
-    load_profile "${profile}"
-    [[ -n "${PROFILE_CONNECTION}" ]] || continue
-    owners+="${PROFILE_CONNECTION}"$'\t'"${profile}"$'\n'
-  done < <(list_profiles)
+  # Built once: looking the owner up per connection meant an awk process per row.
+  local -A owner_of=()
+  local conn prof
+  while IFS=$'\t' read -r conn prof; do
+    [[ -z "${conn}" ]] || owner_of["${conn}"]="${prof}"
+  done < <(profile_connections)
 
   printf '%-32s %-24s %s\n' "CONNECTION" "PROFILE" "STATE"
-  local name state time detail owner
+  local name state time detail
   while IFS=$'\t' read -r name state time; do
     [[ -n "${name}" ]] || continue
-    owner=$(printf '%s' "${owners}" | awk -F'\t' -v n="${name}" '$1 == n { print $2; exit }')
     detail="${state}"
     [[ "${state}" == "Connected" && -n "${time}" ]] && detail="Connected (${time})"
-    printf '%-32s %-24s %s\n' "${name}" "${owner:--}" "${detail}"
-  done <<<"${snapshot}"
+    printf '%-32s %-24s %s\n' "${name}" "${owner_of[${name}]:--}" "${detail}"
+  done <<<"${SNAPSHOT}"
+}
+
+# Candidates for `vpn <Tab>`: profile names plus the connections Viscosity already has.
+# AWS endpoints that have not been synced yet are deliberately left out, since listing
+# them would mean an AWS call on every keystroke. Use --discover for those.
+complete_targets() {
+  list_profiles
+  pgrep -x Viscosity >/dev/null 2>&1 || return 0
+  load_snapshot 2>/dev/null || return 0
+  printf '%s\n' "${SNAPSHOT}" | cut -f1
 }
 
 # --- main --------------------------------------------------------------------------------
 
 main() {
+  local target="${usage_target:-}"
   local action="connect"
-  local target=""
-  local all=false
 
-  while (($#)); do
-    case "${1}" in
-    -s | --status)
-      action="status"
-      shift
-      ;;
-    -d | --down)
-      action="down"
-      shift
-      ;;
-    --sync)
-      action="sync"
-      shift
-      ;;
-    --discover)
-      action="discover"
-      shift
-      ;;
-    -l | --list)
-      action="list"
-      shift
-      ;;
-    --all)
-      all=true
-      shift
-      ;;
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    -*)
-      log_error "Unknown option: '${1}'"
-      usage >&2
-      exit 1
-      ;;
-    *)
-      [[ -z "${target}" ]] || {
-        log_error "Unexpected argument: '${1}'"
-        usage >&2
-        exit 1
-      }
-      target="${1}"
-      shift
-      ;;
-    esac
-  done
+  if [[ "${usage_complete_targets:-}" == "true" ]]; then
+    require_config
+    complete_targets
+    return 0
+  fi
 
+  [[ "${usage_status:-}" != "true" ]] || action="status"
+  [[ "${usage_down:-}" != "true" ]] || action="down"
+  [[ "${usage_sync:-}" != "true" ]] || action="sync"
+  [[ "${usage_discover:-}" != "true" ]] || action="discover"
+  [[ "${usage_list:-}" != "true" ]] || action="list"
+
+  require_macos
   require_config
 
-  # Exit rather than resume, so Ctrl+C during a wait stops the script instead of letting the
-  # loop carry on.
+  trap cleanup EXIT
+  # Exit rather than resume, so Ctrl+C during a wait stops the script instead of letting
+  # the loop carry on.
   trap 'log_warn "Interrupted."; exit 130' INT TERM
 
   case "${action}" in
-  list)
-    list_profiles
-    ;;
-  status)
-    status "${target}"
-    ;;
+  list) list_profiles ;;
+  status) status "${target}" ;;
+  discover) discover "${target}" ;;
   down)
-    if [[ "${all}" == true ]]; then
+    if [[ "${usage_all:-}" == "true" ]]; then
+      [[ -z "${target}" ]] || die "--down --all takes no target"
       down_all
     else
-      load_profile "${target}"
+      resolve_target "${target}"
       down_profile
     fi
-    ;;
-  discover)
-    discover
     ;;
   sync)
     [[ -n "${target}" ]] || die "--sync requires a profile or connection name"
     resolve_sync_target "${target}"
     ;;
   connect)
-    resolve_connect_target "${target}"
+    resolve_target "${target}"
     connect_profile
     ;;
-  *)
-    die "Internal error: unhandled action '${action}'"
-    ;;
+  *) die "Internal error: unhandled action '${action}'" ;;
   esac
 }
 
-main "$@"
+main
