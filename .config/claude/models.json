@@ -7,7 +7,12 @@
     "rank            Lowest rank in a family wins that family's alias pin.",
     "bedrock         System-defined inference profile ID used by `bedrock` mode.",
     "foundationModel Join key matching a discovered application inference profile.",
-    "longContext     Whether the [1m] suffix is appended to the pin.",
+    "longContext     Whether the [1m] suffix is appended to the pin. True only where",
+    "                the model has a 1M variant to select (supports_1m_suffix in the",
+    "                shipped catalog): Opus 5/4.8/4.7 and Sonnet 4.6. Sonnet 5 is",
+    "                natively 1M on Bedrock, Fable has no 1M path there at all, and",
+    "                for both --no-long-context works through",
+    "                CLAUDE_CODE_DISABLE_1M_CONTEXT instead.",
     "capabilities    ANTHROPIC_DEFAULT_<FAMILY>_MODEL_SUPPORTED_CAPABILITIES. Setting it",
     "                DISABLES anything not listed. Valid tokens: effort, xhigh_effort,",
     "                max_effort, thinking, adaptive_thinking, interleaved_thinking.",
@@ -50,7 +55,7 @@
       "rank": 1,
       "bedrock": "global.anthropic.claude-sonnet-5",
       "foundationModel": "anthropic.claude-sonnet-5",
-      "longContext": true,
+      "longContext": false,
       "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
     },
     {
@@ -81,12 +86,21 @@
       "capabilities": "thinking"
     },
     {
-      "id": "claude-fable-5",
+      "id": "claude-fable-5-1",
       "family": "fable",
       "rank": 1,
+      "bedrock": "global.anthropic.claude-fable-5-1",
+      "foundationModel": "anthropic.claude-fable-5-1",
+      "longContext": false,
+      "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
+    },
+    {
+      "id": "claude-fable-5",
+      "family": "fable",
+      "rank": 2,
       "bedrock": "global.anthropic.claude-fable-5",
       "foundationModel": "anthropic.claude-fable-5",
-      "longContext": true,
+      "longContext": false,
       "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
     }
   ]

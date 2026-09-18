@@ -12,7 +12,7 @@
 #USAGE flag "--region <region>"            help_heading="AWS credentials" help="AWS region (required for bedrock/bedrock-app/platform; updates .local if changed)"
 #USAGE flag "--wsl"                        help_heading="AWS credentials" help="Use --no-browser for AWS SSO login (WSL/headless; bedrock/bedrock-app/platform only)"
 #USAGE flag "--workspace-id <workspace_id>" help_heading="Provider options" help="Claude Platform on AWS workspace id, wrkspc_… (required for platform only)"
-#USAGE flag "--no-long-context"            help_heading="Provider options" help="Disable 1M context (1M is the default): bedrock modes use non-[1m] model variants, platform omits the context-1m anthropic-beta header"
+#USAGE flag "--no-long-context"            help_heading="Provider options" help="Hold sessions to the standard 200K context (1M is the default): drops the [1m] suffix from the models that have a 1M variant and sets CLAUDE_CODE_DISABLE_1M_CONTEXT, which is the only lever for the natively-1M models (Sonnet 5 on Bedrock, every model on Claude Platform on AWS)"
 #USAGE flag "--mantle" negate="--no-mantle" default=#false help_heading="Provider options" help="Route Mantle-format model IDs to the Mantle endpoint alongside the Invoke API (bedrock/bedrock-app; off by default — the Invoke API serves every model in models.json, and on bedrock-app a Mantle request would escape application-inference-profile attribution)"
 #USAGE example "claude_switch personal"                                                                                           header="Switch to personal subscription"
 #USAGE example "claude_switch bedrock --profile <aws_profile> --region us-west-2"                                                 header="Switch to Amazon Bedrock via global.* inference profiles (1M context by default)"
@@ -52,6 +52,9 @@ models_table="${dotfriedrice_claude}/models.json"
 # after permissions and before deniedMcpServers. Same method for any key added
 # later, since the binary no longer yields the table to strings(1) and the
 # schemastore schema orders properties differently from the binary.
+#
+# bashOutputMaxChars and taskOutputMaxChars sit where the 2.1.274 settings string
+# table keeps them: after alwaysThinkingEnabled, before cleanupPeriodDays.
 # shellcheck disable=SC2016  # "$schema" is a JSON key, not a shell expansion
 settings_key_order='[
   "$schema", "apiKeyHelper", "proxyAuthHelper", "awsCredentialExport",
@@ -61,33 +64,28 @@ settings_key_order='[
   "deniedMcpServers", "hooks", "disableAllHooks", "statusLine",
   "subagentStatusLine", "enabledPlugins", "extraKnownMarketplaces",
   "skipWebFetchPreflight", "sandbox", "feedbackSurveyRate", "promptCacheTtl",
-  "subagentPromptCacheTtl", "alwaysThinkingEnabled", "effortLevel",
-  "autoCompactWindow", "tui", "theme"
+  "subagentPromptCacheTtl", "alwaysThinkingEnabled", "bashOutputMaxChars",
+  "taskOutputMaxChars", "effortLevel", "autoCompactWindow", "tui", "theme"
 ]'
 
-# Opts out of every Anthropic-bound non-inference transmission, re-asserted each
-# switch so it cannot be silently lost. Bedrock invocation logging is server-side
-# and unaffected, so Athena cost reconciliation keeps working. Privacy invariants
-# only; static settings live in settings_cloud.json.example.
-#
-# Cost: these also disable feature-flag fetching, losing artifacts, /loop
-# self-pacing, cross-session messaging, /schedule, the advisor and the v2 MCP
-# runtime. The template re-enables the last one.
+# Re-asserted on every switch so it cannot be silently lost. DO_NOT_TRACK alone
+# covers telemetry, error reporting and feature-flag fetching; the wider
+# CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC is deliberately unset, since beyond
+# those it only stops the GitHub-bound PR/MR check the status line shows.
+# Feature-flag fetching being off costs Remote Control, cross-machine messaging,
+# claude.ai sync, the advisor and auto mode as the built-in default.
 # shellcheck disable=SC2016  # jq program text, no shell expansion intended
-settings_privacy_jq='
-  def privacy:
-    # Any non-empty value opts out, so this is set, never toggled.
-      .env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
-    | .env.DISABLE_TELEMETRY = "1"
-    | .env.DISABLE_ERROR_REPORTING = "1"
+settings_baseline_jq='
+  def baseline:
+      .env.DO_NOT_TRACK = "1"
+    # Also covers /bug, /share and Claude-drafted feedback.
     | .env.DISABLE_FEEDBACK_COMMAND = "1"
-    | .env.CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY = "1"
-    | .env.DO_NOT_TRACK = "1"
-    # Without this the master switch leaves /fast reporting "currently unavailable".
-    | .env.CLAUDE_CODE_SKIP_FAST_MODE_NETWORK_ERRORS = "1"
-    # Not covered by the master switch. Drops the Anthropic blocklist.
+    # Drops the Anthropic-side WebFetch blocklist call.
     | .skipWebFetchPreflight = true
-    | .feedbackSurveyRate = 0;
+    # 2x the defaults (30000/32000), clamped to 4000-128000. These size the
+    # inline ceiling, which BASH_MAX_OUTPUT_LENGTH never did.
+    | .bashOutputMaxChars = 60000
+    | .taskOutputMaxChars = 64000;
 '
 
 # Places added keys without moving existing ones: a new key lands just before the
@@ -132,6 +130,16 @@ else
   long_context="true"
 fi
 
+# The [1m] suffix no longer tells the whole story: the natively-1M models carry no
+# suffix, and CLAUDE_CODE_DISABLE_1M_CONTEXT is what holds them to 200K.
+_context_tag() {
+  if [[ "$(jq -r '.env.CLAUDE_CODE_DISABLE_1M_CONTEXT // ""' "${1}" 2>/dev/null)" == "1" ]]; then
+    printf ' [200k]'
+  else
+    printf ' [1m]'
+  fi
+}
+
 _status() {
   if [[ -L "${target}" ]]; then
     real="$(readlink "${target}")"
@@ -139,14 +147,13 @@ _status() {
     *personal*) echo "current: personal" ;;
     # Must precede the *bedrock* arm: the app filename also contains "bedrock".
     *bedrock_app*)
-      local aws_prof auth_refresh opus_model opus_name tags
+      local aws_prof auth_refresh opus_name tags
       aws_prof="$(jq -r '.env.AWS_PROFILE // ""' "${real}" 2>/dev/null)"
       auth_refresh="$(jq -r '.awsAuthRefresh // ""' "${real}" 2>/dev/null)"
-      opus_model="$(jq -r '.env.ANTHROPIC_DEFAULT_OPUS_MODEL // ""' "${real}" 2>/dev/null)"
       opus_name="$(jq -r '.env.ANTHROPIC_DEFAULT_OPUS_MODEL_NAME // ""' "${real}" 2>/dev/null)"
       tags=""
       [[ "${auth_refresh}" == *"--no-browser"* ]] && tags+=" [wsl]"
-      [[ "${opus_model}" == *"[1m]"* ]] && tags+=" [1m]"
+      tags+="$(_context_tag "${real}")"
       [[ "$(jq -r '.env.CLAUDE_CODE_USE_MANTLE // ""' "${real}" 2>/dev/null)" == "1" ]] && tags+=" [mantle]"
       [[ -n "${opus_name}" ]] && tags+=" ${opus_name}"
       if [[ -n "${aws_prof}" ]]; then
@@ -156,13 +163,12 @@ _status() {
       fi
       ;;
     *bedrock*)
-      local aws_prof auth_refresh opus_model tags
+      local aws_prof auth_refresh tags
       aws_prof="$(jq -r '.env.AWS_PROFILE // ""' "${real}" 2>/dev/null)"
       auth_refresh="$(jq -r '.awsAuthRefresh // ""' "${real}" 2>/dev/null)"
-      opus_model="$(jq -r '.env.ANTHROPIC_DEFAULT_OPUS_MODEL // ""' "${real}" 2>/dev/null)"
       tags=""
       [[ "${auth_refresh}" == *"--no-browser"* ]] && tags+=" [wsl]"
-      [[ "${opus_model}" == *"[1m]"* ]] && tags+=" [1m]"
+      tags+="$(_context_tag "${real}")"
       # Mantle is opt-in in this mode too, so it is worth surfacing when on.
       [[ "$(jq -r '.env.CLAUDE_CODE_USE_MANTLE // ""' "${real}" 2>/dev/null)" == "1" ]] && tags+=" [mantle]"
       if [[ -n "${aws_prof}" ]]; then
@@ -172,13 +178,12 @@ _status() {
       fi
       ;;
     *platform*)
-      local aws_prof auth_refresh betas tags
+      local aws_prof auth_refresh tags
       aws_prof="$(jq -r '.env.AWS_PROFILE // ""' "${real}" 2>/dev/null)"
       auth_refresh="$(jq -r '.awsAuthRefresh // ""' "${real}" 2>/dev/null)"
-      betas="$(jq -r '.env.ANTHROPIC_BETAS // ""' "${real}" 2>/dev/null)"
       tags=""
       [[ "${auth_refresh}" == *"--no-browser"* ]] && tags+=" [wsl]"
-      [[ "${betas}" == *"context-1m"* ]] && tags+=" [1m]"
+      tags+="$(_context_tag "${real}")"
       if [[ -n "${aws_prof}" ]]; then
         printf 'current: platform (%s)%s\n' "${aws_prof}" "${tags}"
       else
@@ -273,7 +278,7 @@ _update_bedrock_credentials() {
     --argjson keyOrder "${settings_key_order}" \
     --arg p "${effective_profile}" \
     --arg r "${effective_region}" \
-    --arg auth "${desired_auth_refresh}" "${settings_privacy_jq}${settings_reorder_jq}"'
+    --arg auth "${desired_auth_refresh}" "${settings_baseline_jq}${settings_reorder_jq}"'
     # The order Claude Code last wrote.
     (keys_unsorted) as $prior
     | ($table[0].models) as $all
@@ -309,6 +314,11 @@ _update_bedrock_credentials() {
           .env.ANTHROPIC_AWS_WORKSPACE_ID,
           .env.ANTHROPIC_BETAS)
 
+    # --- context window ---
+    # The suffix alone would not reach Sonnet 5, which is natively 1M on Bedrock.
+    | if $lctx then del(.env.CLAUDE_CODE_DISABLE_1M_CONTEXT)
+               else .env.CLAUDE_CODE_DISABLE_1M_CONTEXT = "1" end
+
     # --- models ---
     | if $applyModels then
         # Cleared first so a dropped family cannot survive a switch.
@@ -316,17 +326,13 @@ _update_bedrock_credentials() {
         | reduce $winners[] as $w (.;
             ("ANTHROPIC_DEFAULT_" + ($w.family | ascii_upcase) + "_MODEL") as $k
             | .env[$k] = ($w.value + (if ($lctx and $w.longContext) then "[1m]" else "" end))
-            # Without this the picker row shows the raw provider ID.
-            | .env[$k + "_NAME"] = (if $mode == "bedrock-app"
-                                    then $w.id + " (" + $w.profile + ")"
-                                    else $w.id end)
-            | .env[$k + "_DESCRIPTION"] = (if $mode == "bedrock-app"
-                                           then "Bedrock application inference profile " + $w.profile
-                                           else "Bedrock system-defined inference profile " + $w.value end)
-            # bedrock-app only: this REPLACES built-in detection, which cannot read
-            # an opaque profile ARN. A global.anthropic.claude-* ID it can.
+            # bedrock-app only: Claude Code recognises any <prefix>.anthropic.claude-*
+            # ID, but an ARN resolves to its opaque last segment, which matches
+            # nothing. _SUPPORTED_CAPABILITIES REPLACES built-in detection.
             | if $mode == "bedrock-app"
-              then .env[$k + "_SUPPORTED_CAPABILITIES"] = $w.capabilities
+              then .env[$k + "_NAME"] = $w.id + " (" + $w.profile + ")"
+                 | .env[$k + "_DESCRIPTION"] = "Bedrock application inference profile " + $w.profile
+                 | .env[$k + "_SUPPORTED_CAPABILITIES"] = $w.capabilities
               else . end
           )
         | (if ($overrides | length) > 0 then .modelOverrides = $overrides
@@ -336,7 +342,7 @@ _update_bedrock_credentials() {
                                        else del(.fallbackModel) end)
       else . end
     # Without both, jq would append new keys wherever the last write left off.
-    | privacy
+    | baseline
     | .env |= (to_entries | sort_by(.key) | from_entries)
     | reorder($keyOrder; $prior)
   ' "${file}" >"${tmp}"
@@ -360,8 +366,8 @@ _update_bedrock_credentials() {
   fi
 
   if [[ "${apply_models}" == "true" ]]; then
-    local ctx_note="200K context"
-    [[ "${lctx}" == "true" ]] && ctx_note="1M context where supported"
+    local ctx_note="200K context (CLAUDE_CODE_DISABLE_1M_CONTEXT=1)"
+    [[ "${lctx}" == "true" ]] && ctx_note="1M context where the model supports it"
     printf 'Updated models            → %s versions via modelOverrides, %s\n' \
       "$(jq -r '.modelOverrides // {} | length' "${file}")" "${ctx_note}"
     jq -r '.env
@@ -401,17 +407,17 @@ _report_model_coverage() {
 # SigV4 auth plus the workspace id, so Bedrock/Mantle routing flags must be absent
 # and model IDs are plain Claude API IDs.
 #
-# The context-1m beta is likely redundant here, since the pinned models already run
-# at 1M on the Anthropic API. Kept because an unneeded beta value is harmless.
+# No context-1m beta and no [1m] suffix here: this provider is natively 1M, so
+# --no-long-context is CLAUDE_CODE_DISABLE_1M_CONTEXT alone.
 _update_platform_credentials() {
   local file="${1}" profile="${2}" region="${3}" wsl="${4}" long_context="${5}" wid="${6}"
 
-  local current_profile current_region current_auth_refresh current_wid current_betas
+  local current_profile current_region current_auth_refresh current_wid current_lctx
   current_profile="$(jq -r '.env.AWS_PROFILE // ""' "${file}")"
   current_region="$(jq -r '.env.AWS_REGION // ""' "${file}")"
   current_auth_refresh="$(jq -r '.awsAuthRefresh // ""' "${file}")"
   current_wid="$(jq -r '.env.ANTHROPIC_AWS_WORKSPACE_ID // ""' "${file}")"
-  current_betas="$(jq -r '.env.ANTHROPIC_BETAS // ""' "${file}")"
+  current_lctx="$(jq -r 'if (.env.CLAUDE_CODE_DISABLE_1M_CONTEXT // "") == "1" then "false" else "true" end' "${file}")"
 
   local desired_auth_refresh
   if [[ "${wsl}" == "true" ]]; then
@@ -419,9 +425,6 @@ _update_platform_credentials() {
   else
     desired_auth_refresh="aws sso login --profile ${profile}"
   fi
-
-  local desired_betas=""
-  [[ "${long_context}" == "true" ]] && desired_betas="context-1m-2025-08-07"
 
   local tmp
   tmp="$(mktemp)"
@@ -433,7 +436,7 @@ _update_platform_credentials() {
     --arg w "${wid}" \
     --arg auth "${desired_auth_refresh}" \
     --argjson keyOrder "${settings_key_order}" \
-    --arg betas "${desired_betas}" "${settings_privacy_jq}${settings_reorder_jq}"'
+    --argjson lctx "${long_context}" "${settings_baseline_jq}${settings_reorder_jq}"'
     (keys_unsorted) as $prior
     | .env.AWS_PROFILE = $p
     | .env.AWS_REGION = $r
@@ -445,17 +448,20 @@ _update_platform_credentials() {
     | .env.ANTHROPIC_DEFAULT_OPUS_MODEL   = "claude-opus-5"
     | .env.ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-sonnet-5"
     | .env.ANTHROPIC_DEFAULT_HAIKU_MODEL  = "claude-haiku-4-5"
-    | .env.ANTHROPIC_DEFAULT_FABLE_MODEL  = "claude-fable-5"
+    | .env.ANTHROPIC_DEFAULT_FABLE_MODEL  = "claude-fable-5-1"
+    # Plain Claude API IDs, so no modelOverrides hop is needed to reach them.
+    | .fallbackModel = [ "claude-opus-4-8", "claude-sonnet-5" ]
     # The body idle timeout is inactive here and the byte watchdog needs no opt-in.
     | del(.modelOverrides,
-          .fallbackModel,
+          .env.ANTHROPIC_BETAS,
           .env.CLAUDE_CODE_USE_BEDROCK,
           .env.CLAUDE_CODE_USE_MANTLE,
           .env.ANTHROPIC_BEDROCK_SERVICE_TIER,
           .env.API_FORCE_IDLE_TIMEOUT,
           .env.CLAUDE_ENABLE_BYTE_WATCHDOG_BEDROCK)
-    | if $betas == "" then del(.env.ANTHROPIC_BETAS) else .env.ANTHROPIC_BETAS = $betas end
-    | privacy
+    | if $lctx then del(.env.CLAUDE_CODE_DISABLE_1M_CONTEXT)
+               else .env.CLAUDE_CODE_DISABLE_1M_CONTEXT = "1" end
+    | baseline
     | .env |= (to_entries | sort_by(.key) | from_entries)
     | reorder($keyOrder; $prior)
   ' "${file}" >"${tmp}"
@@ -475,11 +481,11 @@ _update_platform_credentials() {
       printf 'Updated awsAuthRefresh            → standard\n'
     fi
   fi
-  if [[ "${current_betas}" != "${desired_betas}" ]]; then
+  if [[ "${current_lctx}" != "${long_context}" ]]; then
     if [[ "${long_context}" == "true" ]]; then
-      printf 'Updated context window           → 1M (anthropic-beta context-1m-2025-08-07)\n'
+      printf 'Updated context window            → 1M (native on Claude Platform on AWS)\n'
     else
-      printf 'Updated context window           → standard (200K)\n'
+      printf 'Updated context window            → standard (CLAUDE_CODE_DISABLE_1M_CONTEXT=1)\n'
     fi
   fi
   printf 'Settings updated in %s\n' "${file}"

@@ -31,6 +31,14 @@ jq -c '
 
   def tokens: if (. // 0) < 1000 then null else ["2", "\(. / 1000 | floor)k"] end;
 
+  # tokenSamples has no documented shape, so anything but a numeric series is
+  # ignored. Growth since the first sample, in whole k.
+  def growth:
+    if (type == "array" and length >= 2 and (all(.[]; type == "number")))
+    then ((.[-1] - .[0]) / 1000 | floor)
+         | if . >= 1 then ["2", "+\(.)k"] else null end
+    else null end;
+
   # Profile ARNs keep only the id; Bedrock IDs drop routing prefix and suffixes.
   def model:
     split("/") | last
@@ -44,8 +52,12 @@ jq -c '
   | . as $t
   | [ ($t.status // "" | icon),
       ["1", ($t.name // "task")],
+      # Workflow agents carry their own label.
+      (if ($t.label // "") != "" and $t.label != $t.name
+       then ["2", "·\($t.label)"] else empty end),
       (($t.startTime | elapsed) as $e | if $e then ["2", $e] else empty end),
       (ctx($t.tokenCount; $t.contextWindowSize) // ($t.tokenCount | tokens) // empty),
+      (($t.tokenSamples | growth) // empty),
       (if $t.effort then ["2", "·\($t.effort)"] else empty end),
       (if $t.model then ["2", ($t.model | model)] else empty end)
     ] as $seg
