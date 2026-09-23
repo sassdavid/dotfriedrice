@@ -43,29 +43,24 @@ cloud_example="${dotfriedrice_claude}/settings_cloud.json.example"
 models_table="${dotfriedrice_claude}/models.json"
 
 # Claude Code rewrites settings in its own schema key order, so generated files
-# follow it to stay byte-stable across an in-app /model or /config change. Existing
-# keys keep their position; this only places keys the script adds. Read out of the
-# schema key table in the Claude Code binary (2.1.245).
-#
-# enabledMcpjsonServers is absent from that table. Its slot below is where 2.1.272
-# put it when it rewrote settings_personal.json after an in-app /model change:
-# after permissions and before deniedMcpServers. Same method for any key added
-# later, since the binary no longer yields the table to strings(1) and the
-# schemastore schema orders properties differently from the binary.
-#
-# bashOutputMaxChars and taskOutputMaxChars sit where the 2.1.274 settings string
-# table keeps them: after alwaysThinkingEnabled, before cleanupPeriodDays.
+# follow it to stay byte-stable across an in-app /model or /config change. A subset
+# of the top-level keys of the settings zod object in the Claude Code binary
+# (2.1.280), in that object's order; the schemastore schema orders them differently.
+# To refresh, find `bashOutputMaxChars:` in strings(1) output and walk its
+# enclosing object. 2.1.280 moved bashOutputMaxChars/taskOutputMaxChars up
+# between disableAllHooks and statusLine, and placed modelSettings after effortLevel.
 # shellcheck disable=SC2016  # "$schema" is a JSON key, not a shell expansion
 settings_key_order='[
   "$schema", "apiKeyHelper", "proxyAuthHelper", "awsCredentialExport",
   "awsAuthRefresh", "gcpAuthRefresh", "processWrapper", "env", "attribution",
   "includeCoAuthoredBy", "includeGitInstructions", "permissions", "model",
   "fallbackModel", "availableModels", "modelOverrides", "enabledMcpjsonServers",
-  "deniedMcpServers", "hooks", "disableAllHooks", "statusLine",
-  "subagentStatusLine", "enabledPlugins", "extraKnownMarketplaces",
-  "skipWebFetchPreflight", "sandbox", "feedbackSurveyRate", "promptCacheTtl",
-  "subagentPromptCacheTtl", "alwaysThinkingEnabled", "bashOutputMaxChars",
-  "taskOutputMaxChars", "effortLevel", "autoCompactWindow", "tui", "theme"
+  "deniedMcpServers", "hooks", "disableAllHooks", "bashOutputMaxChars",
+  "taskOutputMaxChars", "statusLine", "subagentStatusLine", "enabledPlugins",
+  "extraKnownMarketplaces", "skipWebFetchPreflight", "sandbox",
+  "feedbackSurveyRate", "promptCacheTtl", "subagentPromptCacheTtl",
+  "alwaysThinkingEnabled", "effortLevel", "modelSettings", "autoCompactWindow",
+  "advisorModel", "tui", "theme"
 ]'
 
 # Re-asserted on every switch so it cannot be silently lost. DO_NOT_TRACK alone
@@ -85,33 +80,25 @@ settings_baseline_jq='
     # 2x the defaults (30000/32000), clamped to 4000-128000. These size the
     # inline ceiling, which BASH_MAX_OUTPUT_LENGTH never did.
     | .bashOutputMaxChars = 60000
-    | .taskOutputMaxChars = 64000;
+    | .taskOutputMaxChars = 64000
+    # Opus 5.5 launched at medium; a pre-per-model /effort no longer carries over.
+    | .modelSettings["claude-opus-5-5"].effortLevel = "high";
 '
 
-# Places added keys without moving existing ones: a new key lands just before the
-# first key it outranks, or at the end if it outranks nothing present. Idempotent.
+# Sorts the keys named in $ref into $ref order, as Claude Code does on every write,
+# so a file left in an older order is corrected on the next switch. A key missing
+# from $ref stays right after the $ref key it followed. Idempotent.
 # shellcheck disable=SC2016  # "$ref" is a jq parameter, not a shell expansion
 settings_reorder_jq='
-  def _insert($ref; $k):
-    ($ref | index($k)) as $rank
-    | if $rank == null then . + [$k]
-      else
-        [ to_entries[]
-          | select(.value as $existing
-                   | ($ref | index($existing)) as $r
-                   | $r != null and $r > $rank)
-          | .key ] as $after
-        | ( if ($after | length) == 0 then length else ($after | min) end ) as $at
-        | .[0:$at] + [$k] + .[$at:]
-      end;
-
-  # $prior is the entry order; those keys keep their positions.
-  def reorder($ref; $prior):
+  def reorder($ref):
     . as $obj
     | ($obj | keys_unsorted) as $have
-    | ($prior | map(select(IN($have[])))) as $kept
-    | reduce ($have | map(select(IN($prior[]) | not)))[] as $k
-        ($kept; _insert($ref; $k))
+    | ( reduce $have[] as $k ({ anchor: null, lead: [], after: {} };
+          if ($ref | index($k)) != null then .anchor = $k
+          elif .anchor == null then .lead += [$k]
+          else .after[.anchor] += [$k] end) ) as $unknown
+    | ( $have | map(select(IN($ref[]))) | sort_by(. as $k | $ref | index($k)) ) as $known
+    | $unknown.lead + [ $known[] as $k | $k, ($unknown.after[$k] // [])[] ]
     | reduce .[] as $k ({}; .[$k] = $obj[$k]);
 '
 
@@ -279,9 +266,7 @@ _update_bedrock_credentials() {
     --arg p "${effective_profile}" \
     --arg r "${effective_region}" \
     --arg auth "${desired_auth_refresh}" "${settings_baseline_jq}${settings_reorder_jq}"'
-    # The order Claude Code last wrote.
-    (keys_unsorted) as $prior
-    | ($table[0].models) as $all
+    ($table[0].models) as $all
     | ( if $mode == "bedrock-app"
         then [ $all[]
                | select(.foundationModel != null and $arns[.foundationModel] != null)
@@ -344,7 +329,7 @@ _update_bedrock_credentials() {
     # Without both, jq would append new keys wherever the last write left off.
     | baseline
     | .env |= (to_entries | sort_by(.key) | from_entries)
-    | reorder($keyOrder; $prior)
+    | reorder($keyOrder)
   ' "${file}" >"${tmp}"
 
   if cmp -s "${tmp}" "${file}"; then
@@ -437,20 +422,19 @@ _update_platform_credentials() {
     --arg auth "${desired_auth_refresh}" \
     --argjson keyOrder "${settings_key_order}" \
     --argjson lctx "${long_context}" "${settings_baseline_jq}${settings_reorder_jq}"'
-    (keys_unsorted) as $prior
-    | .env.AWS_PROFILE = $p
+    .env.AWS_PROFILE = $p
     | .env.AWS_REGION = $r
     | .env.AWS_DEFAULT_REGION = $r
     | .awsAuthRefresh = $auth
     | .env.CLAUDE_CODE_USE_ANTHROPIC_AWS = "1"
     | .env.ANTHROPIC_AWS_WORKSPACE_ID = $w
     | .env |= with_entries(select(.key | startswith("ANTHROPIC_DEFAULT_") | not))
-    | .env.ANTHROPIC_DEFAULT_OPUS_MODEL   = "claude-opus-5"
+    | .env.ANTHROPIC_DEFAULT_OPUS_MODEL   = "claude-opus-5-5"
     | .env.ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-sonnet-5"
     | .env.ANTHROPIC_DEFAULT_HAIKU_MODEL  = "claude-haiku-4-5"
     | .env.ANTHROPIC_DEFAULT_FABLE_MODEL  = "claude-fable-5-1"
     # Plain Claude API IDs, so no modelOverrides hop is needed to reach them.
-    | .fallbackModel = [ "claude-opus-4-8", "claude-sonnet-5" ]
+    | .fallbackModel = [ "claude-opus-5", "claude-sonnet-5" ]
     # The body idle timeout is inactive here and the byte watchdog needs no opt-in.
     | del(.modelOverrides,
           .env.ANTHROPIC_BETAS,
@@ -463,7 +447,7 @@ _update_platform_credentials() {
                else .env.CLAUDE_CODE_DISABLE_1M_CONTEXT = "1" end
     | baseline
     | .env |= (to_entries | sort_by(.key) | from_entries)
-    | reorder($keyOrder; $prior)
+    | reorder($keyOrder)
   ' "${file}" >"${tmp}"
 
   if cmp -s "${tmp}" "${file}"; then

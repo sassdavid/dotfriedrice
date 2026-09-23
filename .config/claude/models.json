@@ -9,7 +9,7 @@
     "foundationModel Join key matching a discovered application inference profile.",
     "longContext     Whether the [1m] suffix is appended to the pin. True only where",
     "                the model has a 1M variant to select (supports_1m_suffix in the",
-    "                shipped catalog): Opus 5/4.8/4.7 and Sonnet 4.6. Sonnet 5 is",
+    "                shipped catalog): Opus 5.5/5/4.8/4.7 and Sonnet 4.6. Sonnet 5 is",
     "                natively 1M on Bedrock, Fable has no 1M path there at all, and",
     "                for both --no-long-context works through",
     "                CLAUDE_CODE_DISABLE_1M_CONTEXT instead.",
@@ -23,9 +23,18 @@
   ],
   "models": [
     {
-      "id": "claude-opus-5",
+      "id": "claude-opus-5-5",
       "family": "opus",
       "rank": 1,
+      "bedrock": "global.anthropic.claude-opus-5-5",
+      "foundationModel": "anthropic.claude-opus-5-5",
+      "longContext": true,
+      "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
+    },
+    {
+      "id": "claude-opus-5",
+      "family": "opus",
+      "rank": 2,
       "bedrock": "global.anthropic.claude-opus-5",
       "foundationModel": "anthropic.claude-opus-5",
       "longContext": true,
@@ -34,7 +43,7 @@
     {
       "id": "claude-opus-4-8",
       "family": "opus",
-      "rank": 2,
+      "rank": 3,
       "bedrock": "global.anthropic.claude-opus-4-8",
       "foundationModel": "anthropic.claude-opus-4-8",
       "longContext": true,
@@ -43,7 +52,7 @@
     {
       "id": "claude-opus-4-7",
       "family": "opus",
-      "rank": 3,
+      "rank": 4,
       "bedrock": "global.anthropic.claude-opus-4-7",
       "foundationModel": "anthropic.claude-opus-4-7",
       "longContext": true,

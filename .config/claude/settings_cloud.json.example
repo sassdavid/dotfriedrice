@@ -31,6 +31,8 @@
       "serverName": "plugin:aws-data-analytics:aws-mcp"
     }
   ],
+  "bashOutputMaxChars": 60000,
+  "taskOutputMaxChars": 64000,
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -58,8 +60,11 @@
   },
   "skipWebFetchPreflight": true,
   "promptCacheTtl": "1h",
-  "bashOutputMaxChars": 60000,
-  "taskOutputMaxChars": 64000,
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    }
+  },
   "tui": "fullscreen",
   "theme": "auto"
 }
