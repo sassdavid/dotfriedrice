@@ -52,11 +52,11 @@ models_table="${dotfriedrice_claude}/models.json"
 # shellcheck disable=SC2016  # "$schema" is a JSON key, not a shell expansion
 settings_key_order='[
   "$schema", "apiKeyHelper", "proxyAuthHelper", "awsCredentialExport",
-  "awsAuthRefresh", "gcpAuthRefresh", "processWrapper", "env", "attribution",
-  "includeCoAuthoredBy", "includeGitInstructions", "permissions", "model",
-  "fallbackModel", "availableModels", "modelOverrides", "enabledMcpjsonServers",
-  "deniedMcpServers", "hooks", "disableAllHooks", "bashOutputMaxChars",
-  "statusLine", "subagentStatusLine", "enabledPlugins",
+  "awsAuthRefresh", "gcpAuthRefresh", "processWrapper", "cleanupPeriodDays", "env",
+  "attribution", "includeCoAuthoredBy", "includeGitInstructions", "permissions",
+  "model", "fallbackModel", "availableModels", "modelOverrides",
+  "enabledMcpjsonServers", "deniedMcpServers", "hooks", "disableAllHooks",
+  "bashOutputMaxChars", "statusLine", "subagentStatusLine", "enabledPlugins",
   "extraKnownMarketplaces", "skipWebFetchPreflight", "sandbox",
   "feedbackSurveyRate", "promptCacheTtl", "subagentPromptCacheTtl",
   "alwaysThinkingEnabled", "effortLevel", "modelSettings", "autoCompactWindow",
@@ -75,6 +75,9 @@ settings_baseline_jq='
       .env.DO_NOT_TRACK = "1"
     # Also covers /bug, /share and Claude-drafted feedback.
     | .env.DISABLE_FEEDBACK_COMMAND = "1"
+    # 3x the default (30 days) of local transcript retention for /resume; the sweep
+    # never touches history.jsonl.
+    | .cleanupPeriodDays = 90
     # Drops the Anthropic-side WebFetch blocklist call.
     | .skipWebFetchPreflight = true
     # 2x the default (30000), clamped to 4000-128000. This sizes the inline
