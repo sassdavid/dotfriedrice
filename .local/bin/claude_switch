@@ -45,9 +45,9 @@ models_table="${dotfriedrice_claude}/models.json"
 # Claude Code rewrites settings in its own schema key order, so generated files
 # follow it to stay byte-stable across an in-app /model or /config change. A subset
 # of the top-level keys of the settings zod object in the Claude Code binary
-# (2.1.280), in that object's order; the schemastore schema orders them differently.
-# To refresh, find `bashOutputMaxChars:` in strings(1) output and walk its
-# enclosing object. 2.1.280 moved bashOutputMaxChars/taskOutputMaxChars up
+# (2.1.280, unchanged in 2.1.281), in that object's order; the schemastore schema
+# orders them differently. To refresh, find `bashOutputMaxChars:` in strings(1)
+# output and walk its enclosing object. 2.1.280 moved bashOutputMaxChars up
 # between disableAllHooks and statusLine, and placed modelSettings after effortLevel.
 # shellcheck disable=SC2016  # "$schema" is a JSON key, not a shell expansion
 settings_key_order='[
@@ -56,7 +56,7 @@ settings_key_order='[
   "includeCoAuthoredBy", "includeGitInstructions", "permissions", "model",
   "fallbackModel", "availableModels", "modelOverrides", "enabledMcpjsonServers",
   "deniedMcpServers", "hooks", "disableAllHooks", "bashOutputMaxChars",
-  "taskOutputMaxChars", "statusLine", "subagentStatusLine", "enabledPlugins",
+  "statusLine", "subagentStatusLine", "enabledPlugins",
   "extraKnownMarketplaces", "skipWebFetchPreflight", "sandbox",
   "feedbackSurveyRate", "promptCacheTtl", "subagentPromptCacheTtl",
   "alwaysThinkingEnabled", "effortLevel", "modelSettings", "autoCompactWindow",
@@ -77,10 +77,9 @@ settings_baseline_jq='
     | .env.DISABLE_FEEDBACK_COMMAND = "1"
     # Drops the Anthropic-side WebFetch blocklist call.
     | .skipWebFetchPreflight = true
-    # 2x the defaults (30000/32000), clamped to 4000-128000. These size the
-    # inline ceiling, which BASH_MAX_OUTPUT_LENGTH never did.
+    # 2x the default (30000), clamped to 4000-128000. This sizes the inline
+    # ceiling, which BASH_MAX_OUTPUT_LENGTH never did.
     | .bashOutputMaxChars = 60000
-    | .taskOutputMaxChars = 64000
     # Opus 5.5 launched at medium; a pre-per-model /effort no longer carries over.
     | .modelSettings["claude-opus-5-5"].effortLevel = "high";
 '

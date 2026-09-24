@@ -12,11 +12,7 @@
     "FORCE_AUTOUPDATE_PLUGINS": "1",
     "MCP_PROTOCOL_NEGOTIATION": "auto"
   },
-  "attribution": {
-    "commit": "",
-    "pr": "",
-    "sessionUrl": false
-  },
+  "attribution": false,
   "permissions": {
     "defaultMode": "auto"
   },
@@ -32,7 +28,6 @@
     }
   ],
   "bashOutputMaxChars": 60000,
-  "taskOutputMaxChars": 64000,
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
