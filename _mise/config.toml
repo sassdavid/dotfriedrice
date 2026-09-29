@@ -67,7 +67,7 @@ strip_components = 1
 bin_path = "bin"
 
 [tools."http:aws-msk-iam-auth"]
-version = "2.3.8"
+version = "2.3.9"
 url = "https://github.com/aws/aws-msk-iam-auth/releases/download/v{{ version }}/aws-msk-iam-auth-{{ version }}-all.jar"
 checksum_url = "https://github.com/aws/aws-msk-iam-auth/releases/download/v{{ version }}/aws-msk-iam-auth-{{ version }}-all.jar.sha256"
 version_list_url = "https://api.github.com/repos/aws/aws-msk-iam-auth/releases"

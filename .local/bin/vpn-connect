@@ -639,6 +639,8 @@ endpoints_by_tag() {
 # escape hatch when two endpoints expand to the same name.
 ENDPOINT_MAP=""
 ENDPOINT_MAP_QUERIED=0
+ENDPOINT_MAP_EXPIRED=0
+ENDPOINT_MAP_FAILED=0
 
 build_endpoint_map() {
   local -r filter="${1:-}"
@@ -670,13 +672,23 @@ build_endpoint_map() {
 
   ENDPOINT_MAP_QUERIED="${#queried[@]}"
 
+  # An expired SSO login fails every profile at once, so it is reported once rather than
+  # as one warning per account.
   local i
+  ENDPOINT_MAP_EXPIRED=0
+  ENDPOINT_MAP_FAILED=0
   for i in "${!pids[@]}"; do
-    wait "${pids[i]}" || {
-      log_warn "[${queried[i]}] could not list endpoints:"
-      cat "${dir}/${i}.err" >&2
-    }
+    wait "${pids[i]}" && continue
+    if grep -qiE 'token has expired|sso session .*expired|error loading sso token' "${dir}/${i}.err"; then
+      ENDPOINT_MAP_EXPIRED=$((ENDPOINT_MAP_EXPIRED + 1))
+      continue
+    fi
+    ENDPOINT_MAP_FAILED=$((ENDPOINT_MAP_FAILED + 1))
+    log_warn "[${queried[i]}] could not list endpoints:"
+    cat "${dir}/${i}.err" >&2
   done
+  ((ENDPOINT_MAP_EXPIRED == 0)) ||
+    log_warn "AWS SSO login expired, ${ENDPOINT_MAP_EXPIRED} profile(s) skipped. Log in again with aws sso login and retry."
 
   local rows="" claimed="" raw id name status
   for i in "${!queried[@]}"; do
@@ -968,6 +980,8 @@ resolve_sync_target() {
   case "${#hits[@]}" in
   0)
     log_error "No profile or discoverable endpoint named '${target}'."
+    ((ENDPOINT_MAP_EXPIRED == 0)) ||
+      log_error "${ENDPOINT_MAP_EXPIRED} profile(s) weren't checked because the AWS SSO login expired, so it may exist there."
     log_error "Available:"
     printf '%s\n' "${map}" | awk -F'\t' 'NF { printf "    %-34s (%s, %s)\n", $3, $1, $4 }' >&2
     return 1
@@ -1009,7 +1023,8 @@ discover() {
       # Distinguishes an empty account from a failed query: an expired AWS session fails
       # every profile at once, and pointing at the config file would be misleading.
       log_warn "None of the ${ENDPOINT_MAP_QUERIED} queried profile(s) returned an endpoint."
-      log_warn "If there are errors above, refresh your AWS session and retry."
+      ((ENDPOINT_MAP_FAILED == 0)) ||
+        log_warn "If there are errors above, refresh your AWS session and retry."
     elif [[ -n "${filter}" ]]; then
       log_warn "No aws-clientvpn profile starts with '${filter}'. Run '${0##*/} --list' to see them."
     else

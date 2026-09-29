@@ -9,9 +9,9 @@
     "foundationModel Join key matching a discovered application inference profile.",
     "longContext     Whether the [1m] suffix is appended to the pin. True only where",
     "                the model has a 1M variant to select (supports_1m_suffix in the",
-    "                shipped catalog): Opus 5.5/5/4.8/4.7 and Sonnet 4.6. Sonnet 5 is",
-    "                natively 1M on Bedrock, Fable has no 1M path there at all, and",
-    "                for both --no-long-context works through",
+    "                shipped catalog): Opus 5.5/5/4.8/4.7 and Sonnet 4.6. Sonnet 5.5",
+    "                and 5 are natively 1M on Bedrock, Fable has no 1M path there at",
+    "                all, and for both --no-long-context works through",
     "                CLAUDE_CODE_DISABLE_1M_CONTEXT instead.",
     "capabilities    ANTHROPIC_DEFAULT_<FAMILY>_MODEL_SUPPORTED_CAPABILITIES. Setting it",
     "                DISABLES anything not listed. Valid tokens: effort, xhigh_effort,",
@@ -59,9 +59,18 @@
       "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
     },
     {
-      "id": "claude-sonnet-5",
+      "id": "claude-sonnet-5-5",
       "family": "sonnet",
       "rank": 1,
+      "bedrock": "global.anthropic.claude-sonnet-5-5",
+      "foundationModel": "anthropic.claude-sonnet-5-5",
+      "longContext": false,
+      "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
+    },
+    {
+      "id": "claude-sonnet-5",
+      "family": "sonnet",
+      "rank": 2,
       "bedrock": "global.anthropic.claude-sonnet-5",
       "foundationModel": "anthropic.claude-sonnet-5",
       "longContext": false,
@@ -70,7 +79,7 @@
     {
       "id": "claude-sonnet-4-6",
       "family": "sonnet",
-      "rank": 2,
+      "rank": 3,
       "bedrock": "global.anthropic.claude-sonnet-4-6",
       "foundationModel": "anthropic.claude-sonnet-4-6",
       "longContext": true,
@@ -79,7 +88,7 @@
     {
       "id": "claude-sonnet-4-5-20250929",
       "family": "sonnet",
-      "rank": 3,
+      "rank": 4,
       "bedrock": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
       "foundationModel": "anthropic.claude-sonnet-4-5-20250929-v1:0",
       "longContext": false,
