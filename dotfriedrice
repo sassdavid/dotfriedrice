@@ -1356,7 +1356,7 @@ create_initial_dirs() {
   mkdir -p \
     "${XDG_CONFIG_HOME}/eza" \
     "${XDG_CONFIG_HOME}/k9s/skins" \
-    "${XDG_CONFIG_HOME}/mise/conf.d" \
+    "${XDG_CONFIG_HOME}/mise" \
     "${XDG_DATA_HOME}/zsh/completions" \
     "${HOME}/.aws" \
     "${HOME}/.claude"
@@ -2615,6 +2615,8 @@ set_theme() {
   [ -z "${OS_DISTRO:-}" ] && detect_env
 
   ln -fns "${DOTFRIEDRICE_PATH}/_themes/${theme}/bat.tmTheme" "${XDG_CONFIG_HOME}/bat/themes/theme.tmTheme"
+  # Custom themes only load from bat's binary cache, so rebuild it every time.
+  mise x bat -- bat cache --build >/dev/null
   ln -fns "${DOTFRIEDRICE_PATH}/_themes/${theme}/btop.theme" "${XDG_CONFIG_HOME}/btop/themes/theme.theme"
   ln -fns "${DOTFRIEDRICE_PATH}/_themes/${theme}/eza.yml" "${XDG_CONFIG_HOME}/eza/theme.yml"
   ln -fns "${DOTFRIEDRICE_PATH}/_themes/${theme}/fzf.sh" "${XDG_CONFIG_HOME}/fzf/theme.sh"
@@ -2684,8 +2686,6 @@ set_theme() {
     dfr-reload-app waybar
     dfr-reload-app mako
   fi
-
-  mise x bat -- bat cache --build
 }
 
 healthcheck() {
@@ -2752,8 +2752,14 @@ EOF
 install_mise() {
   _info "INSTALL MISE"
 
+  # Link mise's config and lockfile before any mise command runs so the first
+  # install respects our settings and lockfile, instead of mise's defaults.
+  for file in config.toml mise.lock; do
+    [ -e "${XDG_CONFIG_HOME}/mise/${file}" ] || ln -s "${DOTFRIEDRICE_PATH}/_mise/${file}" "${XDG_CONFIG_HOME}/mise/${file}"
+  done
+
   if ! command -v mise 1>/dev/null; then
-    curl https://mise.run | sh
+    curl https://mise.run | MISE_SELF_UPDATE_MINIMUM_RELEASE_AGE=0s sh
   else
     mise self-update -y
   fi

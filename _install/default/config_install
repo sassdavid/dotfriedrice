@@ -63,7 +63,8 @@ export DEFAULT_CONFIG_INSTALL_ARCH=(
 )
 
 export DEFAULT_CONFIG_INSTALL_DEBIAN=(
-  "ln -fns \"\${DOTFRIEDRICE_PATH}/_mise/conf.d/debian.toml\" \"\${XDG_CONFIG_HOME}/mise/conf.d/debian.toml\""
+  "ln -fns \"\${DOTFRIEDRICE_PATH}/_mise/conf.d/debian.toml\" \"\${XDG_CONFIG_HOME}/mise/config.local.toml\""
+  "ln -fns \"\${DOTFRIEDRICE_PATH}/_mise/debian.lock\" \"\${XDG_CONFIG_HOME}/mise/mise.local.lock\""
 )
 
 export DEFAULT_CONFIG_INSTALL_WSL=(
