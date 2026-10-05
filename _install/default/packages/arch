@@ -160,6 +160,5 @@ export DEFAULT_MISE_ARCH=(
   "tflint"
   "usage"
   "uv"
-  "yamllint"
   "zoxide"
 )

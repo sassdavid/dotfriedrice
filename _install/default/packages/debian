@@ -66,6 +66,5 @@ export DEFAULT_MISE_DEBIAN=(
   "tflint"
   "usage"
   "uv"
-  "yamllint"
   "zoxide"
 )

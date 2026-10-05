@@ -83,6 +83,5 @@ export DEFAULT_MISE_DARWIN=(
   "tflint"
   "usage"
   "uv"
-  "yamllint"
   "zoxide"
 )
