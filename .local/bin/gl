@@ -28,7 +28,7 @@ open_commit_url() {
   local normalized_url=
 
   branch="$(git branch --show-current)"
-  remote="$(git config --get "branch.${branch}.remote")"
+  remote="$(git config --get "branch.${branch}.remote" || true)"
   remote_url="$(git remote get-url "${remote:-origin}" 2>/dev/null)"
 
   # Ensure all remote formats (SSH, HTTPS, variants, etc.) get converted into
@@ -54,7 +54,7 @@ open_commit_url() {
 export -f open_commit_url
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  GIT_ARGS=("--color=always" "--date=short")
+  GIT_ARGS=("--color=always" "--date=short" "--decorate-refs=refs/tags")
   GIT_LOG_SEARCH_MODE="--grep"
 
   for arg in "${@}"; do
@@ -74,7 +74,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
   # %at is a hidden timestamp, it it used for sorting later.
   # COLOR is a placeholder that changes depending on the search result type.
-  FORMAT="%at %C(magenta)%h %C(green)%ad %C(COLOR)> %C(reset)%s"
+  FORMAT="%at %C(magenta)%h %C(green)%ad%C(auto)%(decorate:prefix= %x5B,suffix=%x5D,tag=,separator=%x2C) %C(COLOR)> %C(reset)%s"
   FORMAT_MESSAGE="${FORMAT//COLOR/blue}"
   FORMAT_CODE="${FORMAT//COLOR/yellow}"
 
@@ -126,7 +126,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
               (
                 git log \${case} --pretty='${FORMAT_MESSAGE}' ${GIT_ARGS_STR:-} --grep \"\${query}\"
                 git log \${case} --pretty='${FORMAT_CODE}' ${GIT_ARGS_STR:-} ${GIT_LOG_SEARCH_MODE} \"\${query}\"
-              ) | sort --numeric-sort --reverse --unique --key 1,1
+              ) | sort --unique --key 1,1nr --key 2,2
             fi
           } | ${STRIP_TIMESTAMP}
         fi" \

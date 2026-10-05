@@ -58,7 +58,9 @@
 # --sync also reads the Route 53 private zones attached to the endpoint's VPC and writes them
 # into the connection as DNS search domains. AWS can push a DNS server but not a domain, and
 # without one macOS never queries the VPN resolver, leaving private names unresolvable. This
-# needs route53:ListHostedZonesByVPC; without it --sync warns and imports anyway.
+# needs route53:ListHostedZonesByVPC; without it --sync warns and imports anyway. Zones that
+# VPC Lattice creates for an endpoint count too, so after someone adds a Lattice endpoint to
+# the VPC, delete the connection in Viscosity and run --sync again.
 #
 #   vpn --discover          every endpoint and the name it would import as
 #   vpn --discover acme     only profiles starting with "acme"

@@ -1,9 +1,9 @@
 [settings]
+auto_install = false
 exec_auto_install = false
 experimental = true
 fetch_remote_versions_timeout = "60s"
 http_timeout = "60s"
-idiomatic_version_file = false
 lockfile = true
 locked_verify_provenance = true
 not_found_auto_install = false
@@ -15,6 +15,13 @@ compile = false
 
 [settings.task]
 run_auto_install = false
+
+[settings.self_update]
+minimum_release_age = "0s"
+
+[env]
+# Temporary: Bun in claude misses VPN split-DNS names on macOS, https://github.com/oven-sh/bun/issues/44075
+BUN_FEATURE_FLAG_DISABLE_DNS_CACHE_LIBINFO = "1"
 
 [tools]
 age = "latest"

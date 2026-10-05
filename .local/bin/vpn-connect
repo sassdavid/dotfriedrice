@@ -762,7 +762,12 @@ resolve_endpoint_id() {
 # scopes the VPN resolver to a placeholder domain ("utun10.viscosity") and macOS never sends
 # it a real query, so private-zone names stay unresolvable while the tunnel is up.
 #
-# Zones owned by a service (EKS, EFS) are internal plumbing and only add noise.
+# Zones owned by a service (EKS, EFS, interface endpoints) are internal plumbing, and an
+# interface endpoint zone such as execute-api.<region>.amazonaws.com would also send every
+# public call for that service to the VPC. VPC Lattice is the exception: a resource or service
+# network endpoint with private DNS gets a Lattice-owned zone named after the consumed host,
+# and that host is the reason the tunnel exists. Lattice creates the zone with the endpoint,
+# so a connection synced before the endpoint existed has to be synced again.
 endpoint_search_domains() {
   local vpc names
   vpc=$(aws ec2 describe-client-vpn-endpoints \
@@ -779,7 +784,7 @@ endpoint_search_domains() {
     --vpc-id "${vpc}" \
     --vpc-region "${PROFILE_AWS_REGION}" \
     --output text \
-    --query 'HostedZoneSummaries[?!not_null(Owner.OwningService)].Name')
+    --query "HostedZoneSummaries[?!not_null(Owner.OwningService) || Owner.OwningService=='vpc-lattice.amazonaws.com'].Name")
   [[ -n "${names}" && "${names}" != "None" ]] || return 0
 
   printf '%s\n' "${names}" | tr '\t' '\n' | sed 's/\.$//'
@@ -872,7 +877,7 @@ sync_profile() {
   if [[ -n "${domains}" ]]; then
     log_info "DNS search domains: ${domains//$'\n'/ }"
   else
-    log_warn "The VPC has no private hosted zone, so no DNS search domain is set."
+    log_warn "The VPC has no private hosted zone of its own or from VPC Lattice, so no DNS search domain is set."
   fi
 
   local bundle="${work}/${PROFILE_CONNECTION}.visc"
