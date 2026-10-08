@@ -52,6 +52,9 @@ jq -c '
   | . as $t
   | [ ($t.status // "" | icon),
       ["1", ($t.name // "task")],
+      # agentType (2.1.293) tells custom subagent types apart; the default type is noise.
+      (if ($t.agentType // "") | IN("", "general-purpose", $t.name)
+       then empty else ["36", "[\($t.agentType)]"] end),
       # Workflow agents carry their own label.
       (if ($t.label // "") != "" and $t.label != $t.name
        then ["2", "·\($t.label)"] else empty end),

@@ -1,7 +1,7 @@
 # Claude Code changelog review
 
-Last reviewed: **2.1.284**, reviewed 2026-09-29.
-Next review starts at the first `## ` heading above `## 2.1.284`.
+Last reviewed: **2.1.293**, reviewed 2026-10-07.
+Next review starts at the first `## ` heading above `## 2.1.293`.
 
 Sources:
 
@@ -10,6 +10,57 @@ Sources:
 - https://code.claude.com/docs/en/statusline.md, for the status line input fields
 - the installed binary: `strings -n 3 "$(readlink -f "$(which claude)")"`, for the
   settings key order in `claude_switch` and anything the docs leave out
+
+## 2.1.285 to 2.1.293
+
+Applied:
+
+- Haiku 5.5 (2.1.293) is now the Haiku pin in every provider mode. `models.json` has a new
+  rank-1 Haiku row, with Haiku 4.5 moved to rank 2. That row gives
+  `global.anthropic.claude-haiku-5-5` and the Terraform profile `map-haiku-5-5`, which
+  already existed. Platform mode hard-codes `claude-haiku-5-5`. Checked live on 2026-10-07:
+  us-west-2 has both `global.` and `us.` system profiles. In the binary catalog it is
+  `native_1m` with no `supports_1m_suffix`, so `longContext` is false. It defaults to
+  `medium` effort and always uses adaptive thinking. Its Bedrock `fallback_3p` is Haiku 4.5.
+  Smoke-tested in `bedrock` and `platform` modes. `bedrock-app` mode still gets the
+  `application-inference-profile/*` 403 from the permission set.
+- The `models.json` `longContext` comment and the `--no-long-context` help now list
+  Haiku 5.5 and Fable as natively 1M. 2.1.287 moved Opus 4.7+ and Fable to a native 1M
+  window on Bedrock. The catalog now marks Opus 4.7+ as `native_1m` and still marks them
+  `supports_1m_suffix`, so their `[1m]` pin stays. The docs still say to add the suffix
+  to enable 1M on a pinned model.
+- `subagent-statusline.sh` shows the new `agentType` (2.1.293) in cyan brackets after the
+  name. It skips the field when it is absent, when it is `general-purpose`, or when it
+  repeats the name.
+- The settings key order in the 2.1.293 binary is the same as in 2.1.280.
+
+Checked and left as they are:
+
+- No `modelSettings["claude-haiku-5-5"].effortLevel`. Haiku runs the Explore subagent and
+  background work, where the Claude Code default of `medium` is the better trade.
+  Opus 5.5 and Sonnet 5.5 stay at `high`.
+- `MCP_PROTOCOL_NEGOTIATION=auto` stays. 2.1.292 made stdio servers negotiate by default
+  on every provider. The mcp docs still say claude.ai connector servers are probed in
+  sessions without feature flags only with `auto`, and every profile has
+  `DO_NOT_TRACK=1`.
+- `CLAUDE_ENABLE_BYTE_WATCHDOG_BEDROCK` and `API_FORCE_IDLE_TIMEOUT=0` are unchanged. The
+  watchdog is still off by default on Bedrock. 2.1.290 fixed computer sleep being treated
+  as a stalled stream on Bedrock.
+- Since 2.1.288 the client-side auto mode classifier ignores a Sonnet 5.5 or Opus 5.5
+  `ANTHROPIC_DEFAULT_SONNET_MODEL` pin and uses Sonnet 5 instead. This does not apply
+  here, because Bedrock and Platform use the server-side classifier.
+- New opt-in knobs stay unset: `CLAUDE_CODE_OVERLOADED_RETRY_BASE_DELAY_MS` (2.1.292),
+  `CLAUDE_CODE_DISABLE_STRUCTURED_OUTPUTS` (2.1.288, only for `--mantle` if session titles
+  fail), `CLAUDE_CODE_DISABLE_WEB_FETCH`, `CLAUDE_CODE_NONSTREAMING_TIMEOUT_RETRIES` and
+  `CLAUDE_CODE_SKIP_MODEL_ACCESS_MEMORY` (2.1.285), `CLAUDE_CODE_DISABLE_AUTH_REFRESH_LOCK`
+  (2.1.286) and `CLAUDE_CODE_WEB_SEARCH_REFILLS_PER_HOUR` (2.1.290).
+  `modelSettings.<model>.autoCompactWindow` (2.1.288) also stays unset.
+- `allowedProviders` (2.1.285) is a managed-only setting.
+- You should know (2.1.287) needs first-party telemetry, so it is unavailable with
+  `DO_NOT_TRACK=1`.
+- `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` stays unset. 2.1.290 added the startup
+  connection warm-up to what it skips.
+- The status line needs no change. Its fields are unchanged since 2.1.284.
 
 ## 2.1.282 to 2.1.284
 

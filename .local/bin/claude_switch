@@ -12,7 +12,7 @@
 #USAGE flag "--region <region>"            help_heading="AWS credentials" help="AWS region (required for bedrock/bedrock-app/platform; updates .local if changed)"
 #USAGE flag "--wsl"                        help_heading="AWS credentials" help="Use --no-browser for AWS SSO login (WSL/headless; bedrock/bedrock-app/platform only)"
 #USAGE flag "--workspace-id <workspace_id>" help_heading="Provider options" help="Claude Platform on AWS workspace id, wrkspc_… (required for platform only)"
-#USAGE flag "--no-long-context"            help_heading="Provider options" help="Hold sessions to the standard 200K context (1M is the default): drops the [1m] suffix from the models that have a 1M variant and sets CLAUDE_CODE_DISABLE_1M_CONTEXT, which is the only lever for the natively-1M models (Sonnet 5.5 and 5 on Bedrock, every model on Claude Platform on AWS)"
+#USAGE flag "--no-long-context"            help_heading="Provider options" help="Hold sessions to the standard 200K context (1M is the default): drops the [1m] suffix from the models that have a 1M variant and sets CLAUDE_CODE_DISABLE_1M_CONTEXT, which is the only lever for the natively-1M models (Sonnet 5.5 and 5, Haiku 5.5 and Fable on Bedrock, every model on Claude Platform on AWS)"
 #USAGE flag "--mantle" negate="--no-mantle" default=#false help_heading="Provider options" help="Route Mantle-format model IDs to the Mantle endpoint alongside the Invoke API (bedrock/bedrock-app; off by default — the Invoke API serves every model in models.json, and on bedrock-app a Mantle request would escape application-inference-profile attribution)"
 #USAGE example "claude_switch personal"                                                                                           header="Switch to personal subscription"
 #USAGE example "claude_switch bedrock --profile <aws_profile> --region us-west-2"                                                 header="Switch to Amazon Bedrock via global.* inference profiles (1M context by default)"
@@ -45,7 +45,7 @@ models_table="${dotfriedrice_claude}/models.json"
 # Claude Code rewrites settings in its own schema key order, so generated files
 # follow it to stay byte-stable across an in-app /model or /config change. A subset
 # of the top-level keys of the settings zod object in the Claude Code binary
-# (2.1.280, unchanged through 2.1.284), in that object's order; the schemastore schema
+# (2.1.280, unchanged through 2.1.293), in that object's order; the schemastore schema
 # orders them differently. To refresh, find `bashOutputMaxChars:` in strings(1)
 # output and walk its enclosing object. 2.1.280 moved bashOutputMaxChars up
 # between disableAllHooks and statusLine, and placed modelSettings after effortLevel.
@@ -304,7 +304,8 @@ _update_bedrock_credentials() {
           .env.ANTHROPIC_BETAS)
 
     # --- context window ---
-    # The suffix alone would not reach Sonnet 5.5 or 5, which are natively 1M on Bedrock.
+    # The suffix alone would not reach Sonnet 5.5/5, Haiku 5.5 or Fable, which are
+    # natively 1M on Bedrock.
     | if $lctx then del(.env.CLAUDE_CODE_DISABLE_1M_CONTEXT)
                else .env.CLAUDE_CODE_DISABLE_1M_CONTEXT = "1" end
 
@@ -435,7 +436,7 @@ _update_platform_credentials() {
     | .env |= with_entries(select(.key | startswith("ANTHROPIC_DEFAULT_") | not))
     | .env.ANTHROPIC_DEFAULT_OPUS_MODEL   = "claude-opus-5-5"
     | .env.ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-sonnet-5-5"
-    | .env.ANTHROPIC_DEFAULT_HAIKU_MODEL  = "claude-haiku-4-5"
+    | .env.ANTHROPIC_DEFAULT_HAIKU_MODEL  = "claude-haiku-5-5"
     | .env.ANTHROPIC_DEFAULT_FABLE_MODEL  = "claude-fable-5-1"
     # Plain Claude API IDs, so no modelOverrides hop is needed to reach them.
     | .fallbackModel = [ "claude-opus-5", "claude-sonnet-5-5" ]

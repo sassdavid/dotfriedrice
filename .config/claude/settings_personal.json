@@ -16,7 +16,8 @@
     "defaultMode": "auto"
   },
   "enabledMcpjsonServers": [
-    "terraform"
+    "terraform",
+    "terragrunt-docs"
   ],
   "deniedMcpServers": [
     {

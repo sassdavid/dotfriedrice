@@ -766,7 +766,10 @@ resolve_endpoint_id() {
 # interface endpoint zone such as execute-api.<region>.amazonaws.com would also send every
 # public call for that service to the VPC. VPC Lattice is the exception: a resource or service
 # network endpoint with private DNS gets a Lattice-owned zone named after the consumed host,
-# and that host is the reason the tunnel exists. Lattice creates the zone with the endpoint,
+# and that host is the reason the tunnel exists. MSK multi-VPC connectivity is the other one:
+# its zone (scram.<cluster>.<id>.cN.kafka.<region>.amazonaws.com) holds only that cluster's
+# brokers, which exist nowhere in public DNS. Matching the leading dot keeps the zone of a
+# plain kafka.<region>.amazonaws.com API endpoint out. Both zones appear with their endpoint,
 # so a connection synced before the endpoint existed has to be synced again.
 endpoint_search_domains() {
   local vpc names
@@ -784,7 +787,7 @@ endpoint_search_domains() {
     --vpc-id "${vpc}" \
     --vpc-region "${PROFILE_AWS_REGION}" \
     --output text \
-    --query "HostedZoneSummaries[?!not_null(Owner.OwningService) || Owner.OwningService=='vpc-lattice.amazonaws.com'].Name")
+    --query "HostedZoneSummaries[?!not_null(Owner.OwningService) || Owner.OwningService=='vpc-lattice.amazonaws.com' || ends_with(Name, '.kafka.${PROFILE_AWS_REGION}.amazonaws.com.')].Name")
   [[ -n "${names}" && "${names}" != "None" ]] || return 0
 
   printf '%s\n' "${names}" | tr '\t' '\n' | sed 's/\.$//'
@@ -877,7 +880,7 @@ sync_profile() {
   if [[ -n "${domains}" ]]; then
     log_info "DNS search domains: ${domains//$'\n'/ }"
   else
-    log_warn "The VPC has no private hosted zone of its own or from VPC Lattice, so no DNS search domain is set."
+    log_warn "The VPC has no private hosted zone of its own, from VPC Lattice or from MSK, so no DNS search domain is set."
   fi
 
   local bundle="${work}/${PROFILE_CONNECTION}.visc"
