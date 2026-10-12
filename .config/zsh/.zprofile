@@ -19,13 +19,6 @@ export CARGO_HOME="${RUST_LANG_HOME}/.cargo"
 
 export PATH="${PATH}:${CARGO_HOME}/bin"
 
-# Set mongodb stuffs related enviornment variables
-export MONGOSH_HOME="${HOME}/.local/bin/mongosh"
-export MONGODB_TOOLS_HOME="${HOME}/.local/bin/mongodb-tools"
-export ATLAS_CLI_HOME="${HOME}/.local/bin/atlas-cli"
-
-export PATH="${PATH}:${MONGOSH_HOME}:${MONGODB_TOOLS_HOME}:${ATLAS_CLI_HOME}"
-
 # Default programs to run.
 export EDITOR="nvim"
 export DIFFPROG="nvim -d"

@@ -24,43 +24,44 @@ minimum_release_age = "0s"
 BUN_FEATURE_FLAG_DISABLE_DNS_CACHE_LIBINFO = "1"
 
 [tools]
-age = "latest"
-argocd = "latest"
-gh = "latest"
-fnox = "latest"
-k9s = "latest"
-gitui = "latest"
-golangci-lint = "latest"
-gdu = "latest"
-awscli = { version = "latest", symlink_bins = "true" }
-uv = "latest"
-pre-commit = "latest"
-helm = "latest"
-tflint = "latest"
-ruff = "latest"
-terragrunt = "latest"
-kubectl = "latest"
-hyperfine = "latest"
-maven = "latest"
-terraform-docs = "latest"
-usage = "latest"
-zoxide = "latest"
-terraform = "latest"
-node = "26"
-java = "corretto-17"
-python = "3.14"
-go = "latest"
 1password-cli = "latest"
+age = "latest"
 amazon-ecr-credential-helper = "latest"
-dua = "latest"
-kafkactl = "latest"
+argocd = "latest"
+awscli = { version = "latest", symlink_bins = "true" }
 claude = "latest"
-groovy = "latest"
-hk = "latest"
-pkl = "latest"
+dua = "latest"
+fnox = "latest"
+gdu = "latest"
+gh = "latest"
 gitleaks = "latest"
+gitui = "latest"
+go = "latest"
+golangci-lint = "latest"
+groovy = "latest"
+helm = "latest"
+hk = "latest"
+hyperfine = "latest"
+java = "corretto-17"
+k9s = "latest"
+kafkactl = "latest"
 kubeconform = "latest"
+kubectl = "latest"
+maven = "latest"
+mongosh = "latest"
+node = "26"
+pkl = "latest"
+pre-commit = "latest"
+python = "3.14"
+ruff = "latest"
+terraform = "latest"
+terraform-docs = "latest"
+terragrunt = "latest"
+tflint = "latest"
+usage = "latest"
+uv = "latest"
 yamllint = "latest"
+zoxide = "latest"
 
 [tools."http:kafka"]
 version = "3.9.2"
@@ -92,6 +93,21 @@ version_order = "semver"
 
 [tools."http:kafkactl-aws-plugin".platforms]
 windows-x64 = { url = "https://github.com/deviceinsight/kafkactl-plugins/releases/download/v{{ version }}/kafkactl-aws-plugin_{{ version }}_windows_amd64.zip" }
+
+[tools."github:mongodb/mongodb-atlas-cli"]
+version = "latest"
+version_prefix = "atlascli/v"
+
+[tools."http:mongodb-database-tools"]
+version = "latest"
+url = 'https://fastdl.mongodb.org/tools/db/mongodb-database-tools-{{ os(linux="ubuntu2404") }}-{{ arch(x64="x86_64") }}-{{ version }}.{{ os(macos="zip", linux="tgz", windows="zip") }}'
+checksum_url = "https://downloads.mongodb.org/tools/db/release.json"
+checksum_expr = '"sha256:" + filter(flatten(map(fromJSON(body).versions, { #.downloads })), { #.archive.url == url })[0].archive.sha256'
+version_list_url = "https://downloads.mongodb.org/tools/db/release.json"
+version_expr = 'map(fromJSON(body).versions, { #.version })'
+version_order = "semver"
+strip_components = 1
+bin_path = "bin"
 
 [tools."http:terraform-mcp-server"]
 version = "1.3.0"

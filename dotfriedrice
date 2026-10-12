@@ -2781,10 +2781,6 @@ install_mise_tools() {
   mise install
 }
 
-install_mongodb_tools() {
-  "${DOTFRIEDRICE_PATH}/.local/bin/install_mongodb_tools"
-}
-
 configure_tools() {
   _info "CONFIGURE TOOLS COMPLETION"
 
@@ -2795,6 +2791,7 @@ configure_tools() {
   mise x ripgrep -- rg --generate complete-zsh >"${XDG_DATA_HOME}/zsh/completions/_rg"
   mise x 1password-cli -- op completion zsh >"${XDG_DATA_HOME}/zsh/completions/_op"
   mise x kafkactl -- kafkactl completion zsh >"${XDG_DATA_HOME}/zsh/completions/_kafkactl"
+  mise x github:mongodb/mongodb-atlas-cli -- atlas completion zsh >"${XDG_DATA_HOME}/zsh/completions/_atlas"
 
   printf "\nConfigured completions\n"
 }
@@ -3073,7 +3070,6 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   install_mise
   install_packages
   install_programming_languages
-  install_mongodb_tools
   install_configs
   install_mise_tools
   install_fonts

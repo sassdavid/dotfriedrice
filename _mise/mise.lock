@@ -268,43 +268,36 @@ specifiers = ["latest"]
 checksum = "sha256:491bc3630b704691dd3076e8e4b84a8ee5c6062d6068b88ce49289e3093ca121"
 url = "https://github.com/jdx/fnox/releases/download/v1.39.0/fnox-aarch64-unknown-linux-gnu.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/fnox/.github/workflows/release.yml"
-repository_ids = { repository = "1078762196" }
 
 [tools.fnox."platforms.linux-arm64-musl"]
 checksum = "sha256:a447c814a100c23cd150e9cbb093b860625f6171fcab30bb7779268bb4167fee"
 url = "https://github.com/jdx/fnox/releases/download/v1.39.0/fnox-aarch64-unknown-linux-musl.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/fnox/.github/workflows/release.yml"
-repository_ids = { repository = "1078762196" }
 
 [tools.fnox."platforms.linux-x64"]
 checksum = "sha256:0a623ed38907b9cb633d07593b4d19a4ba741a6a50d226eb243bd16f2f5ba81b"
 url = "https://github.com/jdx/fnox/releases/download/v1.39.0/fnox-x86_64-unknown-linux-gnu.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/fnox/.github/workflows/release.yml"
-repository_ids = { repository = "1078762196" }
 
 [tools.fnox."platforms.linux-x64-musl"]
 checksum = "sha256:08e8035fdedef8ce5318eb981ecb8ad81bda952a7c6ecdd97da3c5044d38979c"
 url = "https://github.com/jdx/fnox/releases/download/v1.39.0/fnox-x86_64-unknown-linux-musl.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/fnox/.github/workflows/release.yml"
-repository_ids = { repository = "1078762196" }
 
 [tools.fnox."platforms.macos-arm64"]
 checksum = "sha256:5604196e7a0aafb949251be1ae088bf0bb524edbfb45748d1be0cbc46e98b8f5"
 url = "https://github.com/jdx/fnox/releases/download/v1.39.0/fnox-aarch64-apple-darwin.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/fnox/.github/workflows/release.yml"
-repository_ids = { repository = "1078762196" }
 
 [tools.fnox."platforms.macos-x64"]
 checksum = "sha256:2234699eeb2495b63bb250229d2e44a5be61d44a13bc780018109b2a4350f2dd"
 url = "https://github.com/jdx/fnox/releases/download/v1.39.0/fnox-x86_64-apple-darwin.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/fnox/.github/workflows/release.yml"
-repository_ids = { repository = "1078762196" }
 
 [tools.fnox."platforms.windows-x64"]
 checksum = "sha256:6eff6a530b3267a29dba9d8da097d8d2b1d344513fe2b7dd4bbe10ee2bb69c40"
 url = "https://github.com/jdx/fnox/releases/download/v1.39.0/fnox-x86_64-pc-windows-msvc.zip"
 signer = "sigstore-oidc:https://github.com/jdx/fnox/.github/workflows/release.yml"
-repository_ids = { repository = "1078762196" }
 
 [[tools.gdu]]
 version = "5.38.0"
@@ -392,6 +385,49 @@ checksum = "sha256:ae64e556ecc240b200f7eba60d550e4bb60d78e860e69dd88c449405b8606
 url = "https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_windows_amd64.zip"
 url_api = "https://api.github.com/repos/cli/cli/releases/assets/599854760"
 provenance = "github-attestations"
+
+[[tools."github:mongodb/mongodb-atlas-cli"]]
+version = "1.59.1"
+backend = "github:mongodb/mongodb-atlas-cli"
+specifiers = ["latest"]
+
+[tools."github:mongodb/mongodb-atlas-cli".options]
+version_prefix = "atlascli/v"
+
+[tools."github:mongodb/mongodb-atlas-cli"."platforms.linux-arm64"]
+checksum = "sha256:b7378c78fc4690b931de247544eea4a56b58c589ead78951689d4d68a77d7d31"
+url = "https://github.com/mongodb/mongodb-atlas-cli/releases/download/atlascli/v1.59.1/mongodb-atlas-cli_1.59.1_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/mongodb/mongodb-atlas-cli/releases/assets/625279988"
+
+[tools."github:mongodb/mongodb-atlas-cli"."platforms.linux-arm64-musl"]
+checksum = "sha256:b7378c78fc4690b931de247544eea4a56b58c589ead78951689d4d68a77d7d31"
+url = "https://github.com/mongodb/mongodb-atlas-cli/releases/download/atlascli/v1.59.1/mongodb-atlas-cli_1.59.1_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/mongodb/mongodb-atlas-cli/releases/assets/625279988"
+
+[tools."github:mongodb/mongodb-atlas-cli"."platforms.linux-x64"]
+checksum = "sha256:36d1f573d6afb9218b157fc4b4bb83387060d5f55bec76aa1ce264eb49fbaffa"
+url = "https://github.com/mongodb/mongodb-atlas-cli/releases/download/atlascli/v1.59.1/mongodb-atlas-cli_1.59.1_linux_x86_64.tar.gz"
+url_api = "https://api.github.com/repos/mongodb/mongodb-atlas-cli/releases/assets/625280215"
+
+[tools."github:mongodb/mongodb-atlas-cli"."platforms.linux-x64-musl"]
+checksum = "sha256:36d1f573d6afb9218b157fc4b4bb83387060d5f55bec76aa1ce264eb49fbaffa"
+url = "https://github.com/mongodb/mongodb-atlas-cli/releases/download/atlascli/v1.59.1/mongodb-atlas-cli_1.59.1_linux_x86_64.tar.gz"
+url_api = "https://api.github.com/repos/mongodb/mongodb-atlas-cli/releases/assets/625280215"
+
+[tools."github:mongodb/mongodb-atlas-cli"."platforms.macos-arm64"]
+checksum = "sha256:907fb836462dd340fffff0bc8bac16fcb15c3178790db9ef580f83d4902bc238"
+url = "https://github.com/mongodb/mongodb-atlas-cli/releases/download/atlascli/v1.59.1/mongodb-atlas-cli_1.59.1_macos_arm64.zip"
+url_api = "https://api.github.com/repos/mongodb/mongodb-atlas-cli/releases/assets/625280353"
+
+[tools."github:mongodb/mongodb-atlas-cli"."platforms.macos-x64"]
+checksum = "sha256:b02394d5781f60e7c3fde7ed2c7a2a12aef4ad052396d974d6cafb7388fa12c5"
+url = "https://github.com/mongodb/mongodb-atlas-cli/releases/download/atlascli/v1.59.1/mongodb-atlas-cli_1.59.1_macos_x86_64.zip"
+url_api = "https://api.github.com/repos/mongodb/mongodb-atlas-cli/releases/assets/625280379"
+
+[tools."github:mongodb/mongodb-atlas-cli"."platforms.windows-x64"]
+checksum = "sha256:a0a7b2a25b2cf57d69e6bb4b815f7e63756e6a967bf348fb9ba3f6f7914d0263"
+url = "https://github.com/mongodb/mongodb-atlas-cli/releases/download/atlascli/v1.59.1/mongodb-atlas-cli_1.59.1_windows_x86_64.zip"
+url_api = "https://api.github.com/repos/mongodb/mongodb-atlas-cli/releases/assets/625280405"
 
 [[tools.gitleaks]]
 version = "8.30.1"
@@ -749,6 +785,42 @@ url = "https://github.com/deviceinsight/kafkactl-plugins/releases/download/v1.3.
 checksum = "sha256:160c0e9a3206a3e800c802f2cb03a94d415597b9df3911effa935dcb997c9db8"
 url = "https://github.com/deviceinsight/kafkactl-plugins/releases/download/v1.3.1/kafkactl-aws-plugin_1.3.1_windows_amd64.zip"
 
+[[tools."http:mongodb-database-tools"]]
+version = "100.19.1"
+backend = "http:mongodb-database-tools"
+specifiers = ["latest"]
+
+[tools."http:mongodb-database-tools".options]
+strip_components = "1"
+
+[tools."http:mongodb-database-tools"."platforms.linux-arm64"]
+checksum = "sha256:ebf518d9a303b36e612e40be106cd0ecc7135dc15d098626f81ac3ee8654a821"
+url = "https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2404-arm64-100.19.1.tgz"
+
+[tools."http:mongodb-database-tools"."platforms.linux-arm64-musl"]
+checksum = "sha256:ebf518d9a303b36e612e40be106cd0ecc7135dc15d098626f81ac3ee8654a821"
+url = "https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2404-arm64-100.19.1.tgz"
+
+[tools."http:mongodb-database-tools"."platforms.linux-x64"]
+checksum = "sha256:f34b84a67ab96b4ff52571ec5d15e2148d96cb140b1ea9ef8c29ac33c48e3480"
+url = "https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2404-x86_64-100.19.1.tgz"
+
+[tools."http:mongodb-database-tools"."platforms.linux-x64-musl"]
+checksum = "sha256:f34b84a67ab96b4ff52571ec5d15e2148d96cb140b1ea9ef8c29ac33c48e3480"
+url = "https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2404-x86_64-100.19.1.tgz"
+
+[tools."http:mongodb-database-tools"."platforms.macos-arm64"]
+checksum = "sha256:54643d4aedb79ddc81797d6fb54113acf79f77fd82a5868b6674f6c74e1b3000"
+url = "https://fastdl.mongodb.org/tools/db/mongodb-database-tools-macos-arm64-100.19.1.zip"
+
+[tools."http:mongodb-database-tools"."platforms.macos-x64"]
+checksum = "sha256:1633f62c42d8cbff79b3f0b2475080ce9e1a536170fce632b64f83ae05520a4a"
+url = "https://fastdl.mongodb.org/tools/db/mongodb-database-tools-macos-x86_64-100.19.1.zip"
+
+[tools."http:mongodb-database-tools"."platforms.windows-x64"]
+checksum = "sha256:527738a0f9ab2d80ea40cb8fc7a68f8e28664a2fd4e3b63626c2d4629aeb7f37"
+url = "https://fastdl.mongodb.org/tools/db/mongodb-database-tools-windows-x86_64-100.19.1.zip"
+
 [[tools."http:terraform-mcp-server"]]
 version = "1.3.0"
 backend = "http:terraform-mcp-server"
@@ -1040,6 +1112,46 @@ url = "https://archive.apache.org/dist/maven/maven-3/3.10.0/binaries/apache-mave
 [tools.maven."platforms.windows-x64"]
 checksum = "sha512:908b1501bfb420bf7c8affb855534a9c407fd6099367bfb9f2f2dcb8e9799102bffb84518cde74c679bd76870247c6528683abdd620581bffa90f95d92d175aa"
 url = "https://archive.apache.org/dist/maven/maven-3/3.10.0/binaries/apache-maven-3.10.0-bin.tar.gz"
+
+[[tools.mongosh]]
+version = "2.13.0"
+backend = "github:mongodb-js/mongosh"
+specifiers = ["latest"]
+
+[tools.mongosh."platforms.linux-arm64"]
+checksum = "sha256:a124ec6680c70ceabc61696bbd110f0da05d7c52524ed402ae9511b5aec7fe32"
+url = "https://github.com/mongodb-js/mongosh/releases/download/v2.13.0/mongosh-2.13.0-linux-arm64.tgz"
+url_api = "https://api.github.com/repos/mongodb-js/mongosh/releases/assets/606365632"
+
+[tools.mongosh."platforms.linux-arm64-musl"]
+checksum = "sha256:a124ec6680c70ceabc61696bbd110f0da05d7c52524ed402ae9511b5aec7fe32"
+url = "https://github.com/mongodb-js/mongosh/releases/download/v2.13.0/mongosh-2.13.0-linux-arm64.tgz"
+url_api = "https://api.github.com/repos/mongodb-js/mongosh/releases/assets/606365632"
+
+[tools.mongosh."platforms.linux-x64"]
+checksum = "sha256:b2089e67641a28aa621476c4d62c69f66b9a41484baba24d8a8b1f5f96e92d0b"
+url = "https://github.com/mongodb-js/mongosh/releases/download/v2.13.0/mongosh-2.13.0-linux-x64.tgz"
+url_api = "https://api.github.com/repos/mongodb-js/mongosh/releases/assets/606363015"
+
+[tools.mongosh."platforms.linux-x64-musl"]
+checksum = "sha256:b2089e67641a28aa621476c4d62c69f66b9a41484baba24d8a8b1f5f96e92d0b"
+url = "https://github.com/mongodb-js/mongosh/releases/download/v2.13.0/mongosh-2.13.0-linux-x64.tgz"
+url_api = "https://api.github.com/repos/mongodb-js/mongosh/releases/assets/606363015"
+
+[tools.mongosh."platforms.macos-arm64"]
+checksum = "sha256:759814a5ea012ad434a0f5c5cb623e02724ae7245a7128224d2baebe61341949"
+url = "https://github.com/mongodb-js/mongosh/releases/download/v2.13.0/mongosh-2.13.0-darwin-arm64.zip"
+url_api = "https://api.github.com/repos/mongodb-js/mongosh/releases/assets/606362844"
+
+[tools.mongosh."platforms.macos-x64"]
+checksum = "sha256:2bf29862dfee06ba0b36c8b633ff559d4132d7554c8f08224e892c2e301667f5"
+url = "https://github.com/mongodb-js/mongosh/releases/download/v2.13.0/mongosh-2.13.0-darwin-x64.zip"
+url_api = "https://api.github.com/repos/mongodb-js/mongosh/releases/assets/606362675"
+
+[tools.mongosh."platforms.windows-x64"]
+checksum = "sha256:7424ffc141513133e3568015a3efc2c41dfdba909a3ef1945891da9a51aa77fa"
+url = "https://github.com/mongodb-js/mongosh/releases/download/v2.13.0/mongosh-2.13.0-win32-x64.zip"
+url_api = "https://api.github.com/repos/mongodb-js/mongosh/releases/assets/606370651"
 
 [[tools.node]]
 version = "26.11.1"
@@ -1405,43 +1517,36 @@ specifiers = ["latest"]
 checksum = "sha256:455668f6f7055c5c40b9046089910344adb499d7a3621aa25d332cde6a749b8f"
 url = "https://github.com/jdx/usage/releases/download/v6.12.1/usage-aarch64-unknown-linux-gnu.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/usage/.github/workflows/publish-cli.yml"
-repository_ids = { repository = "677629099" }
 
 [tools.usage."platforms.linux-arm64-musl"]
 checksum = "sha256:da046ed28c02a18f48c46f00d3ae7b4448a8398eed664c92ae93f38d812c446f"
 url = "https://github.com/jdx/usage/releases/download/v6.12.1/usage-aarch64-unknown-linux-musl.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/usage/.github/workflows/publish-cli.yml"
-repository_ids = { repository = "677629099" }
 
 [tools.usage."platforms.linux-x64"]
 checksum = "sha256:db25b616258fce61af2e07f1aa1c7ed33c7303a8a38abade121920b1dca86488"
 url = "https://github.com/jdx/usage/releases/download/v6.12.1/usage-x86_64-unknown-linux-gnu.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/usage/.github/workflows/publish-cli.yml"
-repository_ids = { repository = "677629099" }
 
 [tools.usage."platforms.linux-x64-musl"]
 checksum = "sha256:10be12209c9ed33781cb93ab17685a8966fa7ab049bf5c7d34b7d231de5aec33"
 url = "https://github.com/jdx/usage/releases/download/v6.12.1/usage-x86_64-unknown-linux-musl.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/usage/.github/workflows/publish-cli.yml"
-repository_ids = { repository = "677629099" }
 
 [tools.usage."platforms.macos-arm64"]
 checksum = "sha256:1f01fb6abe27e5e510778568ae8604720d42986bbeee9ac8cda52c659b84914f"
 url = "https://github.com/jdx/usage/releases/download/v6.12.1/usage-universal-apple-darwin.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/usage/.github/workflows/publish-cli.yml"
-repository_ids = { repository = "677629099" }
 
 [tools.usage."platforms.macos-x64"]
 checksum = "sha256:1f01fb6abe27e5e510778568ae8604720d42986bbeee9ac8cda52c659b84914f"
 url = "https://github.com/jdx/usage/releases/download/v6.12.1/usage-universal-apple-darwin.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/usage/.github/workflows/publish-cli.yml"
-repository_ids = { repository = "677629099" }
 
 [tools.usage."platforms.windows-x64"]
 checksum = "sha256:b5f1e3faa5dea4fff179bdef2e9ac737d2d416496fb9332e0d686e9a4a7b6d2c"
 url = "https://github.com/jdx/usage/releases/download/v6.12.1/usage-x86_64-pc-windows-msvc.zip"
 signer = "sigstore-oidc:https://github.com/jdx/usage/.github/workflows/publish-cli.yml"
-repository_ids = { repository = "677629099" }
 
 [[tools.uv]]
 version = "0.13.0"
