@@ -12,7 +12,7 @@
 #USAGE flag "--region <region>"            help_heading="AWS credentials" help="AWS region (required for bedrock/bedrock-app/platform; updates .local if changed)"
 #USAGE flag "--wsl"                        help_heading="AWS credentials" help="Use --no-browser for AWS SSO login (WSL/headless; bedrock/bedrock-app/platform only)"
 #USAGE flag "--workspace-id <workspace_id>" help_heading="Provider options" help="Claude Platform on AWS workspace id, wrkspc_… (required for platform only)"
-#USAGE flag "--no-long-context"            help_heading="Provider options" help="Hold sessions to the standard 200K context (1M is the default): drops the [1m] suffix from the models that have a 1M variant and sets CLAUDE_CODE_DISABLE_1M_CONTEXT, which is the only lever for the natively-1M models (Sonnet 5.5 and 5, Haiku 5.5 and Fable on Bedrock, every model on Claude Platform on AWS)"
+#USAGE flag "--no-long-context"            help_heading="Provider options" help="Hold sessions to the standard 200K context (1M is the default) by setting CLAUDE_CODE_DISABLE_1M_CONTEXT. Every pinned model is natively 1M on Bedrock and on Claude Platform on AWS, so no pin carries a [1m] suffix"
 #USAGE flag "--mantle" negate="--no-mantle" default=#false help_heading="Provider options" help="Route Mantle-format model IDs to the Mantle endpoint alongside the Invoke API (bedrock/bedrock-app; off by default — the Invoke API serves every model in models.json, and on bedrock-app a Mantle request would escape application-inference-profile attribution)"
 #USAGE example "claude_switch personal"                                                                                           header="Switch to personal subscription"
 #USAGE example "claude_switch bedrock --profile <aws_profile> --region us-west-2"                                                 header="Switch to Amazon Bedrock via global.* inference profiles (1M context by default)"
@@ -45,7 +45,7 @@ models_table="${dotfriedrice_claude}/models.json"
 # Claude Code rewrites settings in its own schema key order, so generated files
 # follow it to stay byte-stable across an in-app /model or /config change. A subset
 # of the top-level keys of the settings zod object in the Claude Code binary
-# (2.1.280, unchanged through 2.1.293), in that object's order; the schemastore schema
+# (2.1.280, unchanged through 2.1.296), in that object's order; the schemastore schema
 # orders them differently. To refresh, find `bashOutputMaxChars:` in strings(1)
 # output and walk its enclosing object. 2.1.280 moved bashOutputMaxChars up
 # between disableAllHooks and statusLine, and placed modelSettings after effortLevel.
@@ -68,7 +68,8 @@ settings_key_order='[
 # CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC is deliberately unset, since beyond
 # those it only stops the GitHub-bound PR/MR check the status line shows.
 # Feature-flag fetching being off costs Remote Control, cross-machine messaging,
-# claude.ai sync, the advisor and auto mode as the built-in default.
+# claude.ai sync and the advisor. Auto mode is the built-in starting mode either
+# way (2.1.283), so permissions.defaultMode stays unset.
 # shellcheck disable=SC2016  # jq program text, no shell expansion intended
 settings_baseline_jq='
   def baseline:
@@ -121,8 +122,8 @@ else
   long_context="true"
 fi
 
-# The [1m] suffix no longer tells the whole story: the natively-1M models carry no
-# suffix, and CLAUDE_CODE_DISABLE_1M_CONTEXT is what holds them to 200K.
+# Pins carry no [1m] suffix (the models are natively 1M), so
+# CLAUDE_CODE_DISABLE_1M_CONTEXT alone says whether a profile is held to 200K.
 _context_tag() {
   if [[ "$(jq -r '.env.CLAUDE_CODE_DISABLE_1M_CONTEXT // ""' "${1}" 2>/dev/null)" == "1" ]]; then
     printf ' [200k]'
@@ -295,17 +296,16 @@ _update_bedrock_credentials() {
     | .awsAuthRefresh = $auth
 
     # --- provider routing ---
-    # del() enforces mode shape: the provider shapes are mutually exclusive.
     | .env.CLAUDE_CODE_USE_BEDROCK = "1"
     | if $mantle then .env.CLAUDE_CODE_USE_MANTLE = "1"
                  else del(.env.CLAUDE_CODE_USE_MANTLE) end
-    | del(.env.CLAUDE_CODE_USE_ANTHROPIC_AWS,
-          .env.ANTHROPIC_AWS_WORKSPACE_ID,
-          .env.ANTHROPIC_BETAS)
+    # Off by default on Bedrock. It replaces the fixed 5-minute body idle timeout,
+    # so CLAUDE_STREAM_IDLE_TIMEOUT_MS governs silent streams, and adds the
+    # first-byte deadline.
+    | .env.CLAUDE_ENABLE_BYTE_WATCHDOG_BEDROCK = "1"
 
     # --- context window ---
-    # The suffix alone would not reach Sonnet 5.5/5, Haiku 5.5 or Fable, which are
-    # natively 1M on Bedrock.
+    # Every pinned model is natively 1M on Bedrock, so the variable is the only lever.
     | if $lctx then del(.env.CLAUDE_CODE_DISABLE_1M_CONTEXT)
                else .env.CLAUDE_CODE_DISABLE_1M_CONTEXT = "1" end
 
@@ -315,7 +315,9 @@ _update_bedrock_credentials() {
         (.env |= with_entries(select(.key | startswith("ANTHROPIC_DEFAULT_") | not)))
         | reduce $winners[] as $w (.;
             ("ANTHROPIC_DEFAULT_" + ($w.family | ascii_upcase) + "_MODEL") as $k
-            | .env[$k] = ($w.value + (if ($lctx and $w.longContext) then "[1m]" else "" end))
+            # No [1m]: on bedrock-app a bare ARN is the value its modelOverrides
+            # entry maps, which is how Claude Code identifies the model.
+            | .env[$k] = $w.value
             # bedrock-app only: Claude Code recognises any <prefix>.anthropic.claude-*
             # ID, but an ARN resolves to its opaque last segment, which matches
             # nothing. _SUPPORTED_CAPABILITIES REPLACES built-in detection.
@@ -357,7 +359,7 @@ _update_bedrock_credentials() {
 
   if [[ "${apply_models}" == "true" ]]; then
     local ctx_note="200K context (CLAUDE_CODE_DISABLE_1M_CONTEXT=1)"
-    [[ "${lctx}" == "true" ]] && ctx_note="1M context where the model supports it"
+    [[ "${lctx}" == "true" ]] && ctx_note="native 1M context"
     printf 'Updated models            → %s versions via modelOverrides, %s\n' \
       "$(jq -r '.modelOverrides // {} | length' "${file}")" "${ctx_note}"
     jq -r '.env
@@ -394,8 +396,9 @@ _report_model_coverage() {
 }
 
 # Claude Platform on AWS shape. Anthropic operates the stack and AWS only supplies
-# SigV4 auth plus the workspace id, so Bedrock/Mantle routing flags must be absent
-# and model IDs are plain Claude API IDs.
+# SigV4 auth plus the workspace id, so model IDs are plain Claude API IDs and no
+# Bedrock/Mantle routing flag belongs here. The body idle timeout is inactive on
+# this provider and its byte watchdog needs no opt-in.
 #
 # No context-1m beta and no [1m] suffix here: this provider is natively 1M, so
 # --no-long-context is CLAUDE_CODE_DISABLE_1M_CONTEXT alone.
@@ -433,21 +436,12 @@ _update_platform_credentials() {
     | .awsAuthRefresh = $auth
     | .env.CLAUDE_CODE_USE_ANTHROPIC_AWS = "1"
     | .env.ANTHROPIC_AWS_WORKSPACE_ID = $w
-    | .env |= with_entries(select(.key | startswith("ANTHROPIC_DEFAULT_") | not))
     | .env.ANTHROPIC_DEFAULT_OPUS_MODEL   = "claude-opus-5-5"
     | .env.ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-sonnet-5-5"
     | .env.ANTHROPIC_DEFAULT_HAIKU_MODEL  = "claude-haiku-5-5"
     | .env.ANTHROPIC_DEFAULT_FABLE_MODEL  = "claude-fable-5-1"
     # Plain Claude API IDs, so no modelOverrides hop is needed to reach them.
     | .fallbackModel = [ "claude-opus-5", "claude-sonnet-5-5" ]
-    # The body idle timeout is inactive here and the byte watchdog needs no opt-in.
-    | del(.modelOverrides,
-          .env.ANTHROPIC_BETAS,
-          .env.CLAUDE_CODE_USE_BEDROCK,
-          .env.CLAUDE_CODE_USE_MANTLE,
-          .env.ANTHROPIC_BEDROCK_SERVICE_TIER,
-          .env.API_FORCE_IDLE_TIMEOUT,
-          .env.CLAUDE_ENABLE_BYTE_WATCHDOG_BEDROCK)
     | if $lctx then del(.env.CLAUDE_CODE_DISABLE_1M_CONTEXT)
                else .env.CLAUDE_CODE_DISABLE_1M_CONTEXT = "1" end
     | baseline

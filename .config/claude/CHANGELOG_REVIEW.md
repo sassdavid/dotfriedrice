@@ -1,15 +1,80 @@
 # Claude Code changelog review
 
-Last reviewed: **2.1.293**, reviewed 2026-10-07.
-Next review starts at the first `## ` heading above `## 2.1.293`.
+Last reviewed: **2.1.296**, reviewed 2026-10-12.
+Next review starts at the first `## ` heading above `## 2.1.296`.
 
 Sources:
 
 - https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md
-- https://code.claude.com/docs/en/env-vars.md, https://code.claude.com/docs/en/settings.md
+- https://code.claude.com/docs/en/env-vars.md, https://code.claude.com/docs/en/settings-reference.md
 - https://code.claude.com/docs/en/statusline.md, for the status line input fields
+- https://code.claude.com/docs/en/amazon-bedrock.md and model-config.md, for pins, 1M and
+  `modelOverrides`; network-config.md for the stream watchdogs
 - the installed binary: `strings -n 3 "$(readlink -f "$(which claude)")"`, for the
   settings key order in `claude_switch` and anything the docs leave out
+
+`claude_switch` does no migration. When a key is retired, edit the settings files by
+hand; the script only writes the keys it owns.
+
+## 2.1.294 to 2.1.296
+
+Removed, each confirmed in the 2.1.296 binary as well as the docs:
+
+- `MCP_PROTOCOL_NEGOTIATION=auto`, from every profile. 2.1.292 (stdio) and 2.1.295
+  (claude.ai connectors) made the unset value probe every server type that `auto` probes.
+  In the binary, an explicit `auto` differs only by skipping Anthropic's per-server
+  negotiation denylist.
+- `API_FORCE_IDLE_TIMEOUT=0`, from both Bedrock profiles and the example. With
+  `CLAUDE_ENABLE_BYTE_WATCHDOG_BEDROCK=1`, the byte watchdog replaces the 5-minute body
+  idle timeout on Bedrock (network-config, "Streaming idle watchdogs"; `hasBodyIdleWatchdog`
+  in the binary).
+- The `[1m]` suffix on the Opus pin, and the `longContext` column with the code that
+  appended it. Since 2.1.287 Opus 4.7+, Sonnet 5+, Haiku 5.5 and Fable are natively 1M on
+  Bedrock, an application profile ARN included when `modelOverrides` maps it. In the
+  binary, the suffix only adds the `context-1m-2025-08-07` beta header. Only Opus 4.6 and
+  Sonnet 4.6 still need it, and neither is a pin. `--no-long-context` is now
+  `CLAUDE_CODE_DISABLE_1M_CONTEXT` alone.
+- `permissions.defaultMode: "auto"`. Auto has been the built-in starting mode in the
+  terminal and VS Code since 2.1.283, and for `-p` without feature flags since 2.1.285.
+- `"autoUpdate": true` on `anthropic-agent-skills`. It is an official marketplace name, so
+  auto-update is on by default.
+
+Changed in `claude_switch`:
+
+- Every migration `del()` is gone (platform keys in bedrock mode; Bedrock keys,
+  `modelOverrides` and `ANTHROPIC_BETAS` in platform mode). The toggles stay
+  (`--mantle`, `--no-long-context`), and so does the rebuild of the
+  `ANTHROPIC_DEFAULT_*` keys from `models.json`.
+- `CLAUDE_ENABLE_BYTE_WATCHDOG_BEDROCK` moved out of `settings_cloud.json.example` and
+  is set by the bedrock updater, so the example is provider-neutral. Verified: a fresh
+  bootstrap of each mode produces files identical to the edited `.local` files.
+- The settings key order in the 2.1.296 binary is the same as in 2.1.280.
+
+Fixed in `subagent-statusline.sh`: `label` repeats `description` when there is no
+progress summary, so it is now skipped in that case. The `startTime` (epoch ms) and
+`tokenSamples` comments follow the now-documented shapes.
+
+Checked and left as they are:
+
+- `modelOverrides` stays in both Bedrock modes. In `bedrock-app` it is how Claude Code
+  identifies an ARN as a model (1M window, refusal fallback), and how `fallbackModel`
+  and the older versions stay on MAP-attributed profiles. In `bedrock` it pins
+  explicit `global.*` routing. Without it, Claude Code prefers `us.` in us-west-2, and
+  `ANTHROPIC_BEDROCK_REGION_PREFIX=global` is the alternative. Checked live: all 12
+  `global.*` and all 12 `map-*` profiles are ACTIVE in us-west-2.
+- `AWS_DEFAULT_REGION` stays. boto3 reads only `AWS_DEFAULT_REGION` (the CLI v2 and Claude
+  Code read `AWS_REGION` first), so Python tools Claude runs need it.
+- `modelSettings` `high` for Opus 5.5 and Sonnet 5.5 stays. The catalog default is
+  still `medium`.
+- `promptCacheTtl: "1h"`: cloud providers default to 5m. The personal profile needs
+  none, since subscriptions get 1h within plan usage.
+- New opt-in knobs stay unset: `CLAUDE_CODE_OVERLOADED_RETRY_MAX_DELAY_MS`,
+  `CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL` (2.1.296), `CLAUDE_CODE_RETRY_WATCHDOG_MAX_WAIT_MS`
+  (2.1.295).
+- The MCP description cap default rose to 4096 (2.1.296). The terraform server
+  instructions (4295 chars) lose only their last ~200 characters.
+- The status line needs no change. Every field it reads is documented. 2.1.296 fixed
+  Sonnet 5.5 cache-read pricing in the cost field.
 
 ## 2.1.285 to 2.1.293
 

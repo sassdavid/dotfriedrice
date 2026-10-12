@@ -13,12 +13,9 @@ jq -c '
     elif . == "running"   then ["33", "●"]
     else ["2", "◦"] end;
 
-  # startTime format is undocumented, so accept ISO, epoch seconds and epoch ms.
+  # startTime is epoch milliseconds.
   def elapsed:
-    (if type == "string" then (fromdateiso8601? // null)
-     elif type == "number" then (if . > 1e11 then . / 1000 else . end)
-     else null end) as $t
-    | if $t == null then null else (now - $t | floor) end
+    (if type == "number" then (now - . / 1000 | floor) else null end)
     | if . == null or . < 0 then null
       elif . < 60 then "\(.)s"
       elif . < 3600 then "\(. / 60 | floor)m\(. % 60)s"
@@ -31,10 +28,10 @@ jq -c '
 
   def tokens: if (. // 0) < 1000 then null else ["2", "\(. / 1000 | floor)k"] end;
 
-  # tokenSamples has no documented shape, so anything but a numeric series is
-  # ignored. Growth since the first sample, in whole k.
+  # tokenSamples holds up to the last 16 tokenCount readings, oldest first.
+  # Growth since the first sample, in whole k.
   def growth:
-    if (type == "array" and length >= 2 and (all(.[]; type == "number")))
+    if (type == "array" and length >= 2)
     then ((.[-1] - .[0]) / 1000 | floor)
          | if . >= 1 then ["2", "+\(.)k"] else null end
     else null end;
@@ -55,9 +52,10 @@ jq -c '
       # agentType (2.1.293) tells custom subagent types apart; the default type is noise.
       (if ($t.agentType // "") | IN("", "general-purpose", $t.name)
        then empty else ["36", "[\($t.agentType)]"] end),
-      # Workflow agents carry their own label.
-      (if ($t.label // "") != "" and $t.label != $t.name
-       then ["2", "·\($t.label)"] else empty end),
+      # label is a progress summary, or a copy of description when there is none,
+      # which the description segment below already shows.
+      (if ($t.label // "") | IN("", $t.name, $t.description)
+       then empty else ["2", "·\($t.label)"] end),
       (($t.startTime | elapsed) as $e | if $e then ["2", $e] else empty end),
       (ctx($t.tokenCount; $t.contextWindowSize) // ($t.tokenCount | tokens) // empty),
       (($t.tokenSamples | growth) // empty),

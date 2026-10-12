@@ -7,19 +7,18 @@
     "rank            Lowest rank in a family wins that family's alias pin.",
     "bedrock         System-defined inference profile ID used by `bedrock` mode.",
     "foundationModel Join key matching a discovered application inference profile.",
-    "longContext     Whether the [1m] suffix is appended to the pin. True only where",
-    "                the model has a 1M variant to select (supports_1m_suffix in the",
-    "                shipped catalog): Opus 5.5/5/4.8/4.7 and Sonnet 4.6. Sonnet 5.5",
-    "                and 5, Haiku 5.5 and Fable are natively 1M with no suffix to",
-    "                select, so for them --no-long-context works only through",
-    "                CLAUDE_CODE_DISABLE_1M_CONTEXT.",
     "capabilities    ANTHROPIC_DEFAULT_<FAMILY>_MODEL_SUPPORTED_CAPABILITIES. Setting it",
     "                DISABLES anything not listed. Valid tokens: effort, xhigh_effort,",
     "                max_effort, thinking, adaptive_thinking, interleaved_thinking.",
     "",
     "Only the four family pins can carry capabilities, so in bedrock-app mode the older",
     "versions reached through modelOverrides fall back to Claude Code's own detection,",
-    "which cannot read an opaque profile ARN. Use `bedrock` mode for those."
+    "which cannot read an opaque profile ARN. Use `bedrock` mode for those.",
+    "",
+    "Pins carry no [1m] suffix. Since 2.1.287 every model here except Sonnet 4.6 is",
+    "natively 1M on Bedrock, an application profile ARN included when modelOverrides",
+    "maps it; the suffix would only add the context-1m beta header. Sonnet 4.6 runs at",
+    "200K, which is moot while it is not its family's rank 1."
   ],
   "models": [
     {
@@ -28,7 +27,6 @@
       "rank": 1,
       "bedrock": "global.anthropic.claude-opus-5-5",
       "foundationModel": "anthropic.claude-opus-5-5",
-      "longContext": true,
       "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
     },
     {
@@ -37,7 +35,6 @@
       "rank": 2,
       "bedrock": "global.anthropic.claude-opus-5",
       "foundationModel": "anthropic.claude-opus-5",
-      "longContext": true,
       "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
     },
     {
@@ -46,7 +43,6 @@
       "rank": 3,
       "bedrock": "global.anthropic.claude-opus-4-8",
       "foundationModel": "anthropic.claude-opus-4-8",
-      "longContext": true,
       "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
     },
     {
@@ -55,7 +51,6 @@
       "rank": 4,
       "bedrock": "global.anthropic.claude-opus-4-7",
       "foundationModel": "anthropic.claude-opus-4-7",
-      "longContext": true,
       "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
     },
     {
@@ -64,7 +59,6 @@
       "rank": 1,
       "bedrock": "global.anthropic.claude-sonnet-5-5",
       "foundationModel": "anthropic.claude-sonnet-5-5",
-      "longContext": false,
       "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
     },
     {
@@ -73,7 +67,6 @@
       "rank": 2,
       "bedrock": "global.anthropic.claude-sonnet-5",
       "foundationModel": "anthropic.claude-sonnet-5",
-      "longContext": false,
       "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
     },
     {
@@ -82,7 +75,6 @@
       "rank": 3,
       "bedrock": "global.anthropic.claude-sonnet-4-6",
       "foundationModel": "anthropic.claude-sonnet-4-6",
-      "longContext": true,
       "capabilities": "effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
     },
     {
@@ -91,7 +83,6 @@
       "rank": 4,
       "bedrock": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
       "foundationModel": "anthropic.claude-sonnet-4-5-20250929-v1:0",
-      "longContext": false,
       "capabilities": "thinking,interleaved_thinking"
     },
     {
@@ -100,7 +91,6 @@
       "rank": 1,
       "bedrock": "global.anthropic.claude-haiku-5-5",
       "foundationModel": "anthropic.claude-haiku-5-5",
-      "longContext": false,
       "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
     },
     {
@@ -109,7 +99,6 @@
       "rank": 2,
       "bedrock": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
       "foundationModel": "anthropic.claude-haiku-4-5-20251001-v1:0",
-      "longContext": false,
       "capabilities": "thinking"
     },
     {
@@ -118,7 +107,6 @@
       "rank": 1,
       "bedrock": "global.anthropic.claude-fable-5-1",
       "foundationModel": "anthropic.claude-fable-5-1",
-      "longContext": false,
       "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
     },
     {
@@ -127,7 +115,6 @@
       "rank": 2,
       "bedrock": "global.anthropic.claude-fable-5",
       "foundationModel": "anthropic.claude-fable-5",
-      "longContext": false,
       "capabilities": "effort,xhigh_effort,max_effort,thinking,adaptive_thinking,interleaved_thinking"
     }
   ]
