@@ -19,10 +19,6 @@ run_auto_install = false
 [settings.self_update]
 minimum_release_age = "0s"
 
-[env]
-# Temporary: Bun in claude misses VPN split-DNS names on macOS, https://github.com/oven-sh/bun/issues/44075
-BUN_FEATURE_FLAG_DISABLE_DNS_CACHE_LIBINFO = "1"
-
 [tools]
 1password-cli = "latest"
 age = "latest"
