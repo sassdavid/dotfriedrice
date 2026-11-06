@@ -2555,9 +2555,12 @@ install_rust() {
     "${rustup_bin}" update
   fi
 
-  # Nightly for benchmarks (cargo +nightly bench), `rustup update` keeps it up to date afterwards.
+  # Nightly for benchmarks (cargo +nightly bench) and clippy with --all-features (the simd feature
+  # needs nightly), `rustup update` keeps it up to date afterwards.
   if ! "${rustup_bin}" toolchain list | grep -q '^nightly-'; then
-    "${rustup_bin}" toolchain install nightly --profile minimal
+    "${rustup_bin}" toolchain install nightly --profile minimal --component clippy
+  else
+    "${rustup_bin}" component add clippy --toolchain nightly
   fi
 
   "${rustup_bin}" completions zsh >"${XDG_DATA_HOME}/zsh/completions/_rustup"
