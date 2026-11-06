@@ -62,6 +62,7 @@ export DEFAULT_PACKAGES_PACMAN_GUI=(
   "ghostty"
   "gimp"
   "grim"
+  "gvfs-mtp"
   "hyprpicker"
   "iptables"
   "kdenlive"

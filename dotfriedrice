@@ -1322,6 +1322,7 @@ create_initial_dirs() {
   if [ "${GUI_ENABLED}" == "1" ]; then
     mkdir -p \
       "${XDG_CACHE_HOME}/mpd" \
+      "${XDG_CONFIG_HOME}/Thunar" \
       "${XDG_CONFIG_HOME}/fontconfig" \
       "${XDG_CONFIG_HOME}/gtk-3.0" \
       "${XDG_CONFIG_HOME}/gtk-4.0" \
@@ -2284,11 +2285,11 @@ configure_gui_app_themes() {
 
       firefox_modified="0"
 
-      if ! grep --fixed-strings --quiet 'user_pref("browser.theme.toolbar-theme", 0);' "${firefox_prefs_js}"; then
-        if grep --extended-regexp --quiet 'user_pref\("browser.theme.toolbar-theme", [0-9]+\);' "${firefox_prefs_js}"; then
-          sed -i 's/user_pref("browser.theme.toolbar-theme", [0-9]\+);/user_pref("browser.theme.toolbar-theme", 0);/g' "${firefox_prefs_js}"
+      if ! grep --fixed-strings --quiet 'user_pref("browser.theme.native-theme", true);' "${firefox_prefs_js}"; then
+        if grep --extended-regexp --quiet 'user_pref\("browser.theme.native-theme", (true|false)\);' "${firefox_prefs_js}"; then
+          sed -i 's/user_pref("browser.theme.native-theme", \(true\|false\));/user_pref("browser.theme.native-theme", true);/g' "${firefox_prefs_js}"
         else
-          echo 'user_pref("browser.theme.toolbar-theme", 0);' >>"${firefox_prefs_js}"
+          echo 'user_pref("browser.theme.native-theme", true);' >>"${firefox_prefs_js}"
         fi
         firefox_modified="1"
       fi
@@ -2554,6 +2555,11 @@ install_rust() {
     "${rustup_bin}" update
   fi
 
+  # Nightly for benchmarks (cargo +nightly bench), `rustup update` keeps it up to date afterwards.
+  if ! "${rustup_bin}" toolchain list | grep -q '^nightly-'; then
+    "${rustup_bin}" toolchain install nightly --profile minimal
+  fi
+
   "${rustup_bin}" completions zsh >"${XDG_DATA_HOME}/zsh/completions/_rustup"
   "${rustup_bin}" completions zsh cargo >"${XDG_DATA_HOME}/zsh/completions/_cargo"
 }
@@ -2654,6 +2660,12 @@ set_theme() {
       # Even after symlinking settings.ini, gsettings still needs to run to
       # switch the active theme so it takes effect.
       gsettings set org.gnome.desktop.interface gtk-theme "${theme}"
+
+      # We also want to set a preference to either dark or light since certain
+      # applications will inherit from this value.
+      local variant
+      variant="$(jq --raw-output ".variant" "${DOTFRIEDRICE_PATH}/_themes/${theme}/_theme.json")"
+      gsettings set org.gnome.desktop.interface color-scheme prefer-"${variant}"
     fi
 
     [ -n "${switch_wallpaper}" ] && "${DOTFRIEDRICE_PATH}/.local/bin/dfr-theme-set-bg"

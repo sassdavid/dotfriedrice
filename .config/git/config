@@ -28,3 +28,8 @@
 [include]
   path = ~/.config/gitalias/gitalias.txt
   path = ~/.config/git/config.local.includes
+
+[url "git@ssh.bitbucket.org:"]
+  insteadOf = git@bitbucket.org:
+[url "ssh://git@ssh.bitbucket.org/"]
+  insteadOf = ssh://git@bitbucket.org/

@@ -3,13 +3,15 @@
 # in optional custom args so you can do adhoc conversions.
 #
 #  Examples:
-#   convert img2jpg hello.jpg
+#   convert img2jpg hello.jpg                # Operate on 1 file
+#   convert img2jpg *.png                    # Operate on all PNG files
 #   convert img2jpg hello.jpg -quality 5     # Override the default quality
 #   convert img2jpg hello.jpg -resize 640x   # Resize to 640 width w/ aspect ratio
 #   convert img2jpg hello.jpg -resize 640x!  # Resize to 640 width w/o aspect ratio
 #   convert img2jpg hello.jpg -resize x480   # Resize to 480 height w/ aspect ratio
 #   convert img2jpg hello.jpg -resize x480!  # Resize to 480 height w/o aspect ratio
 #   convert img2jpg hello.jpg -resize 10%    # Resize to 10% w/ aspect ratio
+#   convert --prompt img2jpg hello.jpg       # Provide custom args through a Walker menu
 
 set -o errexit
 set -o pipefail
@@ -29,6 +31,7 @@ IMG_OPTS_PNG=(
   -define png:compression-filter=5
   -define png:compression-strategy=1
   -define png:exclude-chunk=all
+  -strip
 )
 
 img2jpg() {
@@ -37,7 +40,7 @@ img2jpg() {
 
   shift
 
-  magick "${image}" "${IMG_OPTS_JPG[@]}" "$@" "${image%.*}${OUTPUT_SUFFIX}.jpg"
+  magick "${image}" "${IMG_OPTS_JPG[@]}" "${@}" "${image%.*}${OUTPUT_SUFFIX}.jpg"
 }
 
 img2jpg-small() {
@@ -46,8 +49,7 @@ img2jpg-small() {
 
   shift
 
-  magick "${image}" -resize "${SMALL_MAX_WIDTH}x" "${IMG_OPTS_JPG[@]}" \
-    "$@" "${image%.*}${OUTPUT_SUFFIX}.jpg"
+  img2jpg "${image}" -resize "${SMALL_MAX_WIDTH}x" "${@}"
 }
 
 img2png() {
@@ -56,7 +58,7 @@ img2png() {
 
   shift
 
-  magick "${image}" "${IMG_OPTS_PNG[@]}" "$@" "${image%.*}${OUTPUT_SUFFIX}.png"
+  magick "${image}" "${IMG_OPTS_PNG[@]}" "${@}" "${image%.*}${OUTPUT_SUFFIX}.png"
 }
 
 img2png-small() {
@@ -65,17 +67,58 @@ img2png-small() {
 
   shift
 
-  magick "${image}" -resize "${SMALL_MAX_WIDTH}x" "${IMG_OPTS_PNG[@]}" \
-    "$@" "${image%.*}${OUTPUT_SUFFIX}.png"
+  img2png "${image}" -resize "${SMALL_MAX_WIDTH}x" "${@}"
 }
 
 help() {
-  printf "%s <command> [args]\n\nCommands:\n" "${0}"
+  printf "%s [--prompt|-p] <command> [args]\n\nCommands:\n" "${0}"
 
   compgen -A function | grep -v "^_" | cat -n
 
-  printf "\nExtended help:\n  Each command has comments for general usage\n"
+  cat <<EOF
+
+Extended help:
+  - Each command has comments for general usage
+  - Run magick --help for specific options you can pass into this script
+EOF
 }
 
 TIMEFORMAT=$'\nCommand completed in %3lR'
-time "${@:-help}"
+
+prompt_args=()
+
+# Handle being able to pass in --prompt which lets you interactively add flags
+# through Walker, this comes in handy if you're launching this script through a
+# file manager context menu or hotkey and you want flexibility.
+if [[ "${1:-}" == "-p" || "${1:-}" == "--prompt" ]]; then
+  shift
+  input=$(printf "[Default options]\n" | walker --dmenu --placeholder "${1:-} args...") || exit
+  read -r -a prompt_args <<<"${input}"
+  [ "${prompt_args[0]:-}" == "[Default" ] && prompt_args=()
+fi
+
+command="${1:-help}"
+shift || true
+
+files=()
+args=()
+
+for arg in "${@}"; do
+  if [ -f "${arg}" ]; then
+    files+=("${arg}")
+  else
+    args+=("${arg}")
+  fi
+done
+
+args+=("${prompt_args[@]}")
+
+time {
+  if [ ${#files[@]} -eq 0 ]; then
+    "${command}" "${args[@]}"
+  else
+    for file in "${files[@]}"; do
+      "${command}" "${file}" "${args[@]}"
+    done
+  fi
+}
