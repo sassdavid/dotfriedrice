@@ -1,7 +1,7 @@
 # Claude Code changelog review
 
-Last reviewed: **2.1.296**, reviewed 2026-10-12.
-Next review starts at the first `## ` heading above `## 2.1.296`.
+Last reviewed: **2.1.318**, reviewed 2026-11-06.
+Next review starts at the first `## ` heading above `## 2.1.318`.
 
 Sources:
 
@@ -15,6 +15,74 @@ Sources:
 
 `claude_switch` does no migration. When a key is retired, edit the settings files by
 hand; the script only writes the keys it owns.
+
+## 2.1.297 to 2.1.318
+
+No new models; no setting is retired or required. Nothing changed in the profiles.
+
+Applied in the status lines:
+
+- `statusline.sh` reads `prompt_cache.expires_at` and shows the time left before the
+  cache goes cold (`◷40m`), yellow in the last fifth of the TTL. It trusts
+  `expires_at` over `warm`, so an idle refresh turns `cold` without a new response.
+  That is when idle compaction runs and the next message re-caches everything.
+- It also reads `prompt_cache.recache_tokens_if_cold` and shows it as `⇡340k`, red
+  when cold and yellow when expiring, hidden otherwise. Misses moved after these and
+  keep the cache color.
+- One `printf '%(%s)T'` clock read (`NOW`) replaces `date +%s` in the git cache check.
+- `subagent-statusline.sh` shows `killed` (documented status) as a dim `⊘`, so a task
+  you stopped no longer looks like the unknown-state `◦`.
+- The `[1m]` stripping is gone from both scripts (dead since 2.1.311).
+- Checked with mock input for warm, expiring, expired-while-idle, cold, a 5m TTL, a
+  null recache count, no `prompt_cache` yet, a profile ARN and subagent rows.
+  shellcheck passes.
+
+Checked and left as they are:
+
+- Settings key order in the 2.1.318 binary: every key `claude_switch` owns keeps its
+  relative order. The new `idleCompaction` (2.1.299) sorts after `theme`.
+- Shorter system prompt for unrecognized names such as profile ARNs (2.1.312): no
+  effect. Opus/Sonnet/Haiku 5.5 and Fable already get the shorter prompt (env-vars,
+  `CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT`), and every pin is one of them.
+- Refusal fallback (2.1.314, 2.1.318): the docs still say a Sonnet or Opus pin that
+  names the model that refused leaves the refusal standing, so the 2.1.284 conclusion
+  holds. 2.1.318: under "Ask each time" a subagent's flagged request now fails instead
+  of switching.
+- Idle compaction (2.1.299; Bedrock/1h cache and telemetry-off subscribers since
+  2.1.314) is now live in every profile. Default `true` kept. It summarizes a 200K+
+  conversation idle ~54 min before the 1h cache expires; the summary replaces the
+  conversation only if the cache has gone cold by the next message. Off:
+  `idleCompaction: false` or `/config`.
+- Subagents on another model (2.1.317) use that model's `modelSettings` effort or its
+  default, not the session's. Haiku 5.5 Explore runs at `medium`, as intended in
+  2.1.293. `CLAUDE_CODE_SUBAGENT_EFFORT` (2.1.316) stays unset.
+- `claude -p` with no permission mode starts in `default` on third-party providers
+  or with telemetry off (2.1.302). Interactive sessions still start in auto. No
+  script in this repo runs `claude -p`; pass `--permission-mode auto` if one does.
+- `API_TIMEOUT_MS` is documented as the time to receive response headers (and the
+  whole budget of a non-streaming attempt), not a total-request ceiling. 1800000
+  kept; the default 600000 would also do. `0` (no limit) since 2.1.305.
+- Bedrock and Mantle fetch the signed model catalog from downloads.claude.ai (2.1.311).
+  `CLAUDE_CODE_MODEL_CATALOG=off` stays unset, so new models are recognized without
+  an upgrade.
+- Monitor tool and plugin monitors (2.1.310) and `/auto-mode-setup` (2.1.304) now work
+  on Bedrock and with `DO_NOT_TRACK=1`.
+- `/advisor` on Claude Platform on AWS (2.1.300): the advisor and platform docs still
+  say it is unavailable there. Untested.
+- `CLAUDE_CODE_AUTO_COMPACT_WINDOW` accepts `k`/`M` suffixes since 2.1.304.
+- `deniedMcpServers` URL entries also block matching Anthropic-provided servers
+  (2.1.318). The entries here use `serverName`, unaffected.
+- MCP allow rules: `mcp__a` no longer covers `a__b` (2.1.299). No profile has MCP
+  permission rules.
+- Transcripts record each request's system prompt and tools (2.1.300). With
+  `cleanupPeriodDays: 90`, `~/.claude/projects` was 753M on 2026-11-06.
+- New opt-in knobs stay unset: `CLAUDE_CODE_DISABLE_ULTRATHINK`,
+  `CLAUDE_CODE_DISABLE_FILE_MENTIONS`, `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS`,
+  `CLAUDE_CODE_AUTO_MODE_MODEL`, `CLAUDE_CODE_WARN_DISK_FREE_GIB`,
+  `permissions.blockWritesOutsideWorkingDirectories` (2.1.314; it would block edits to
+  `~/.claude` and dotfiles outside the project).
+- `modelPricing` is managed-only.
+- Opus 4.8 fast mode is deprecated (2.1.316) and removed on 2026-11-30. Not used here.
 
 ## 2.1.294 to 2.1.296
 

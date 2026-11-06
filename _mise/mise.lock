@@ -917,7 +917,7 @@ checksum = "sha256:8b2526451162e16d803ab014f7070f0f412962cdffffdcf446e70a8463624
 url = "https://releases.hashicorp.com/terraform-mcp-server/1.4.1/terraform-mcp-server_1.4.1_linux_amd64.zip"
 
 [tools."http:terraform-mcp-server"."platforms.macos-arm64"]
-checksum = "blake3:6fdbeba3c2d71b5bfe5196b3ce3e179d2a5dae352323223dde9862f547ae11c7"
+checksum = "sha256:10e6d49e8437b4099d2d4435d87b95c6896a98ec4ba140bdaa48d0aaadc17f1b"
 url = "https://releases.hashicorp.com/terraform-mcp-server/1.4.1/terraform-mcp-server_1.4.1_darwin_arm64.zip"
 
 [tools."http:terraform-mcp-server"."platforms.macos-x64"]

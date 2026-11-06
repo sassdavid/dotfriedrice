@@ -48,6 +48,11 @@ eval "$(jq -r '
   @sh "CACHE_OBSERVED=\(.prompt_cache.caching_observed // false)",
   @sh "CACHE_WARM=\(.prompt_cache.warm // false)",
   @sh "CACHE_TTL=\(.prompt_cache.ttl // "")",
+  @sh "CACHE_EXPIRES=\(.prompt_cache.expires_at // null
+                       | if . == null then "" else floor end)",
+  @sh "RECACHE=\(.prompt_cache.recache_tokens_if_cold // 0
+                 | if . >= 1000 then ((. / 1000 | floor | tostring) + "k")
+                   elif . > 0 then tostring else "" end)",
   @sh "CACHE_MISSES=\(.prompt_cache.misses // 0)",
   @sh "CACHE_MISS_CAUSE=\(.prompt_cache.last_miss_cause.causes // [] | first // "")",
   @sh "RATE_5H_PCT=\(.rate_limits.five_hour.used_percentage // "")",
@@ -78,13 +83,19 @@ RESET=$'\033[0m'
 # Glyphs in one block. Nerd Font PUA by default; STATUSLINE_GLYPHS=unicode
 # falls back to East Asian Width Neutral glyphs from the same font.
 if [[ ${STATUSLINE_GLYPHS:-nerd} == nerd ]]; then
-  # bolt, clone, robot, lightbulb, home, git-branch, pr-draft, refresh.
+  # bolt, clone, robot, lightbulb, home, git-branch, pr-draft, refresh,
+  # hourglass-half, upload.
   G_THINK=$'\uf0e7' G_ARN=$'\uf24d' G_AGENT=$'\uebb1' G_STYLE=$'\uf0eb'
   G_PROJ=$'\uf015' G_WT=$'\uf418' G_PR_DRAFT=$'\uebaa' G_MISS=$'\ueb37'
+  G_TIMER=$'\uf252' G_RECACHE=$'\uf093'
 else
   G_THINK='⚡' G_ARN='◫' G_AGENT='✶' G_STYLE='◆'
   G_PROJ='⌂' G_WT='↪' G_PR_DRAFT='◔' G_MISS='✕'
+  G_TIMER='◷' G_RECACHE='⇡'
 fi
+
+# One clock read for every age computed below.
+printf -v NOW '%(%s)T' -1
 
 # stdout is captured, so tput cannot read the width; COLUMNS is exported instead.
 COLS=${COLUMNS:-80}
@@ -128,7 +139,7 @@ else
 fi
 
 cache_is_stale() {
-  [[ ! -f ${CACHE_FILE} ]] || (($(date +%s) - $(cache_mtime "${CACHE_FILE}") > CACHE_MAX_AGE))
+  [[ ! -f ${CACHE_FILE} ]] || ((NOW - $(cache_mtime "${CACHE_FILE}") > CACHE_MAX_AGE))
 }
 
 if cache_is_stale; then
@@ -173,8 +184,7 @@ MODEL_DISPLAY+="]${RESET}"
 
 # Confirms the session bills through a MAP-attributed profile (bedrock-app mode).
 if [[ ${MODEL_ID} == *application-inference-profile/* ]]; then
-  PROFILE_ID=${MODEL_ID##*/}
-  MODEL_DISPLAY+=" ${DIM}${G_ARN}${PROFILE_ID%\[1m\]}${RESET}"
+  MODEL_DISPLAY+=" ${DIM}${G_ARN}${MODEL_ID##*/}${RESET}"
 fi
 
 SESSION_LABEL=""
@@ -254,22 +264,36 @@ fi
 # CACHE_PCT, the last request's read ratio, stands in until the first response
 # fills it and on providers that report no cache tokens.
 CACHE_SHOWN=${CACHE_HIT}
-if [[ ${CACHE_OBSERVED} == true ]] && ((CACHE_HIT >= 0)); then
+CACHE_OBSERVED_OK=false
+[[ ${CACHE_OBSERVED} == true ]] && ((CACHE_HIT >= 0)) && CACHE_OBSERVED_OK=true
+
+# `warm` is as of the last update; expires_at lets an idle refresh see the cache
+# go cold, the moment idle compaction runs and the next message re-caches it all.
+CACHE_LEFT=""
+CACHE_EXPIRING=false
+if [[ ${CACHE_OBSERVED_OK} == true && ${CACHE_WARM} == true && -n ${CACHE_EXPIRES} ]]; then
+  CACHE_LEFT=$((CACHE_EXPIRES - NOW))
+  if ((CACHE_LEFT <= 0)); then
+    CACHE_WARM=false CACHE_LEFT=""
+  else
+    case ${CACHE_TTL} in 1h) TTL_S=3600 ;; 5m) TTL_S=300 ;; *) TTL_S=0 ;; esac
+    # The last fifth of the TTL: the next message is still cheap, not for long.
+    ((TTL_S > 0 && CACHE_LEFT * 5 < TTL_S)) && CACHE_EXPIRING=true
+  fi
+fi
+
+if [[ ${CACHE_OBSERVED_OK} == true ]]; then
   CACHE_TEXT="cache ${CACHE_HIT}%"
   # The TTL the provider actually granted; on Bedrock 1h is per-model.
   [[ -n ${CACHE_TTL} ]] && CACHE_TEXT+="·${CACHE_TTL}"
   [[ ${CACHE_WARM} != true ]] && CACHE_TEXT+=" cold"
-  if ((CACHE_MISSES > 0)); then
-    CACHE_TEXT+=" ${G_MISS}${CACHE_MISSES}"
-    [[ -n ${CACHE_MISS_CAUSE} ]] && ((COLS >= 110)) && CACHE_TEXT+=" ${CACHE_MISS_CAUSE}"
-  fi
 else
   CACHE_TEXT="cache ${CACHE_PCT}%"
   CACHE_SHOWN=${CACHE_PCT}
 fi
 
 if ((CACHE_SHOWN >= 0)); then
-  if [[ ${CACHE_OBSERVED} == true && ${CACHE_WARM} != true ]]; then
+  if [[ ${CACHE_OBSERVED_OK} == true && ${CACHE_WARM} != true ]]; then
     CACHE_COLOR=${RED}
   elif ((CACHE_SHOWN >= 70)); then
     CACHE_COLOR=${GREEN}
@@ -279,6 +303,28 @@ if ((CACHE_SHOWN >= 0)); then
     CACHE_COLOR=${DIM}
   fi
   LINE2+=" ${DIM}|${RESET} ${CACHE_COLOR}${CACHE_TEXT}${RESET}"
+
+  if [[ -n ${CACHE_LEFT} ]]; then
+    ((CACHE_LEFT >= 60)) && LEFT_FMT="$((CACHE_LEFT / 60))m" || LEFT_FMT="${CACHE_LEFT}s"
+    [[ ${CACHE_EXPIRING} == true ]] && LEFT_COLOR=${YELLOW} || LEFT_COLOR=${DIM}
+    LINE2+=" ${LEFT_COLOR}${G_TIMER}${LEFT_FMT}${RESET}"
+  fi
+
+  # Tokens the next message writes to the cache once it is cold: shown when that
+  # is now (red) or soon (yellow).
+  if [[ -n ${RECACHE} && ${CACHE_OBSERVED_OK} == true ]]; then
+    if [[ ${CACHE_WARM} != true ]]; then
+      LINE2+=" ${RED}${G_RECACHE}${RECACHE}${RESET}"
+    elif [[ ${CACHE_EXPIRING} == true ]]; then
+      LINE2+=" ${YELLOW}${G_RECACHE}${RECACHE}${RESET}"
+    fi
+  fi
+
+  if [[ ${CACHE_OBSERVED_OK} == true ]] && ((CACHE_MISSES > 0)); then
+    MISS_TEXT="${G_MISS}${CACHE_MISSES}"
+    [[ -n ${CACHE_MISS_CAUSE} ]] && ((COLS >= 110)) && MISS_TEXT+=" ${CACHE_MISS_CAUSE}"
+    LINE2+=" ${CACHE_COLOR}${MISS_TEXT}${RESET}"
+  fi
 fi
 
 if [[ ${COST_NONZERO} == 1 ]]; then

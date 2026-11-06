@@ -10,6 +10,13 @@ not_found_auto_install = false
 use_versions_host = false
 minimum_release_age = "0s"
 
+[settings.url_replacements]
+# archive.apache.org throttles automated clients (10-60s/request, refused connections).
+# Maven Central serves byte-identical files (same sha512/sha256) from a CDN.
+'regex:^https://archive\.apache\.org/dist/maven/maven-3/([^/]+)/binaries/(.+)$' = "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/$1/$2"
+'regex:^https://archive\.apache\.org/dist/groovy/?$' = "https://repo.maven.apache.org/maven2/org/apache/groovy/groovy-binary/"
+'regex:^https://archive\.apache\.org/dist/groovy/([^/]+)/distribution/apache-groovy-binary-([^/]+)\.zip$' = "https://repo.maven.apache.org/maven2/org/apache/groovy/groovy-binary/$1/groovy-binary-$2.zip"
+
 [settings.python]
 compile = false
 
@@ -94,6 +101,8 @@ windows-x64 = { url = "https://github.com/deviceinsight/kafkactl-plugins/release
 version = "latest"
 version_prefix = "atlascli/v"
 
+# release.json lists only the current release: re-checksumming an older locked
+# version fails ("could not resolve the configured checksum"), so lock with --bump.
 [tools."http:mongodb-database-tools"]
 version = "latest"
 url = 'https://fastdl.mongodb.org/tools/db/mongodb-database-tools-{{ os(linux="ubuntu2404") }}-{{ arch(x64="x86_64") }}-{{ version }}.{{ os(macos="zip", linux="tgz", windows="zip") }}'

@@ -45,7 +45,7 @@ models_table="${dotfriedrice_claude}/models.json"
 # Claude Code rewrites settings in its own schema key order, so generated files
 # follow it to stay byte-stable across an in-app /model or /config change. A subset
 # of the top-level keys of the settings zod object in the Claude Code binary
-# (2.1.280, unchanged through 2.1.296), in that object's order; the schemastore schema
+# (2.1.280, unchanged through 2.1.318), in that object's order; the schemastore schema
 # orders them differently. To refresh, find `bashOutputMaxChars:` in strings(1)
 # output and walk its enclosing object. 2.1.280 moved bashOutputMaxChars up
 # between disableAllHooks and statusLine, and placed modelSettings after effortLevel.

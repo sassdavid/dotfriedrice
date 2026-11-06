@@ -10,6 +10,8 @@ jq -c '
   def icon:
     if   . == "completed" then ["32", "✓"]
     elif . == "failed"    then ["31", "✗"]
+    # Stopped by you or by Claude, not an error: dim, unlike failed.
+    elif . == "killed"    then ["2", "⊘"]
     elif . == "running"   then ["33", "●"]
     else ["2", "◦"] end;
 
@@ -39,7 +41,7 @@ jq -c '
   # Profile ARNs keep only the id; Bedrock IDs drop routing prefix and suffixes.
   def model:
     split("/") | last
-    | sub("\\[1m\\]$"; "") | sub("-v1:0$"; "")
+    | sub("-v1:0$"; "")
     | sub("^(global|us|eu|apac|us-gov)\\.anthropic\\."; "") | sub("^anthropic\\."; "")
     | sub("^claude-"; "");
 
