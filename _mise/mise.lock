@@ -163,80 +163,73 @@ url = "https://github.com/argoproj/argo-cd/releases/download/v3.6.1/argocd-windo
 url_api = "https://api.github.com/repos/argoproj/argo-cd/releases/assets/709773035"
 
 [[tools.awscli]]
-version = "2.39.5"
+version = "2.39.6"
 backend = "aqua:aws/aws-cli"
 specifiers = ["latest"]
 
 [tools.awscli."platforms.linux-arm64"]
-checksum = "sha256:ce7b03ebceed1dc6a0a8f27134a41a9a3b5671f09c57ab2e7fc6d43710dbaef3"
-url = "https://awscli.amazonaws.com/awscli-exe-linux-aarch64-2.39.5.zip"
+checksum = "sha256:5763332bdcb432c19ee122545856fd350c3bb306753212deedcfccc76f4d20c3"
+url = "https://awscli.amazonaws.com/awscli-exe-linux-aarch64-2.39.6.zip"
 
 [tools.awscli."platforms.linux-arm64-musl"]
-checksum = "sha256:ce7b03ebceed1dc6a0a8f27134a41a9a3b5671f09c57ab2e7fc6d43710dbaef3"
-url = "https://awscli.amazonaws.com/awscli-exe-linux-aarch64-2.39.5.zip"
+checksum = "sha256:5763332bdcb432c19ee122545856fd350c3bb306753212deedcfccc76f4d20c3"
+url = "https://awscli.amazonaws.com/awscli-exe-linux-aarch64-2.39.6.zip"
 
 [tools.awscli."platforms.linux-x64"]
-checksum = "sha256:fe0553306b3d001d162bc193d3b040027aab3466b9f910b50e702c122c0f3ff9"
-url = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.39.5.zip"
+checksum = "sha256:7a121264f2637a3b90767aaf5bdd43ee88b8c925a931d0479fa2ce22b1a2fa76"
+url = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.39.6.zip"
 
 [tools.awscli."platforms.linux-x64-musl"]
-checksum = "sha256:fe0553306b3d001d162bc193d3b040027aab3466b9f910b50e702c122c0f3ff9"
-url = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.39.5.zip"
+checksum = "sha256:7a121264f2637a3b90767aaf5bdd43ee88b8c925a931d0479fa2ce22b1a2fa76"
+url = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.39.6.zip"
 
 [tools.awscli."platforms.macos-arm64"]
-checksum = "sha256:f89c9288dbd9bd0579914ea3a72acc14bca1ae3d3112e92bcb29ff5a48b88131"
-url = "https://awscli.amazonaws.com/AWSCLIV2-2.39.5.pkg"
+checksum = "blake3:b3b91871326cbbccb487130f318e1ae74f7a8ebdcd073cb34684382ab45009f2"
+url = "https://awscli.amazonaws.com/AWSCLIV2-2.39.6.pkg"
 
 [tools.awscli."platforms.macos-x64"]
-checksum = "sha256:f89c9288dbd9bd0579914ea3a72acc14bca1ae3d3112e92bcb29ff5a48b88131"
-url = "https://awscli.amazonaws.com/AWSCLIV2-2.39.5.pkg"
+checksum = "sha256:ec350e9e8e9ceb49ccd2cb7fcdc69f3b6a424f83dbae64f3dc6499157a5eca07"
+url = "https://awscli.amazonaws.com/AWSCLIV2-2.39.6.pkg"
 
 [[tools.claude]]
-version = "2.1.318"
+version = "2.1.319"
 backend = "aqua:anthropics/claude-code"
 specifiers = ["latest"]
 
 [tools.claude."platforms.linux-arm64"]
-checksum = "sha256:0f4fb66a2af3bf02d114099727e4a7745f117b1e63d2f77c8aff165590197421"
-checksum_source = "mise-versions"
-url = "https://github.com/anthropics/claude-code/releases/download/v2.1.318/claude-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/anthropics/claude-code/releases/assets/707216465"
+checksum = "sha256:2e7348ffc96d52ccb20e34c81240ebc92505edc84d7bf29182d62c29bf6fa066"
+url = "https://github.com/anthropics/claude-code/releases/download/v2.1.319/claude-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/anthropics/claude-code/releases/assets/715418861"
 
 [tools.claude."platforms.linux-arm64-musl"]
-checksum = "sha256:198e232519752b4f64a39252507cd693b16eb2107a36ecc4a2b78971d1ad36ef"
-checksum_source = "mise-versions"
-url = "https://github.com/anthropics/claude-code/releases/download/v2.1.318/claude-linux-arm64-musl.tar.gz"
-url_api = "https://api.github.com/repos/anthropics/claude-code/releases/assets/707216467"
+checksum = "sha256:221b257ed3dc334a2b039730feff2f609677a79b4b589735690cb37438212bed"
+url = "https://github.com/anthropics/claude-code/releases/download/v2.1.319/claude-linux-arm64-musl.tar.gz"
+url_api = "https://api.github.com/repos/anthropics/claude-code/releases/assets/715418857"
 
 [tools.claude."platforms.linux-x64"]
-checksum = "sha256:e6d426ca0c123f61fad58a361da0329f2a93cd206bc87040ed8d9576dd9eb583"
-checksum_source = "mise-versions"
-url = "https://github.com/anthropics/claude-code/releases/download/v2.1.318/claude-linux-x64.tar.gz"
-url_api = "https://api.github.com/repos/anthropics/claude-code/releases/assets/707216832"
+checksum = "sha256:8cf226393c8eca446d6ca60fa6bbe3fa7b5fa4de82a7b410d1edbd48689cd776"
+url = "https://github.com/anthropics/claude-code/releases/download/v2.1.319/claude-linux-x64.tar.gz"
+url_api = "https://api.github.com/repos/anthropics/claude-code/releases/assets/715419124"
 
 [tools.claude."platforms.linux-x64-musl"]
-checksum = "sha256:6f6d85b6faf3f5ed2655e9aefd52289ca30647ed4503647c2bfd342e1a5431f9"
-checksum_source = "mise-versions"
-url = "https://github.com/anthropics/claude-code/releases/download/v2.1.318/claude-linux-x64-musl.tar.gz"
-url_api = "https://api.github.com/repos/anthropics/claude-code/releases/assets/707216466"
+checksum = "sha256:bab9ece513740d9bf92a5ca45a2af62a33aa31099448e4a63b07f1c43fb5d625"
+url = "https://github.com/anthropics/claude-code/releases/download/v2.1.319/claude-linux-x64-musl.tar.gz"
+url_api = "https://api.github.com/repos/anthropics/claude-code/releases/assets/715418859"
 
 [tools.claude."platforms.macos-arm64"]
-checksum = "sha256:cd7fa988d60e7aef7ed453847650255138440b229d081496b8ed0ab75836603b"
-checksum_source = "mise-versions"
-url = "https://github.com/anthropics/claude-code/releases/download/v2.1.318/claude-darwin-arm64.tar.gz"
-url_api = "https://api.github.com/repos/anthropics/claude-code/releases/assets/707216476"
+checksum = "sha256:7ae10919ce40346befabe3c18da4d5ccc860201b6785b3ae726d8961472d0e5d"
+url = "https://github.com/anthropics/claude-code/releases/download/v2.1.319/claude-darwin-arm64.tar.gz"
+url_api = "https://api.github.com/repos/anthropics/claude-code/releases/assets/715418856"
 
 [tools.claude."platforms.macos-x64"]
-checksum = "sha256:ea3e05371b9e8760e5d366529db9c6a96d968f5d1a41ba42ad61687c9a3f8173"
-checksum_source = "mise-versions"
-url = "https://github.com/anthropics/claude-code/releases/download/v2.1.318/claude-darwin-x64.tar.gz"
-url_api = "https://api.github.com/repos/anthropics/claude-code/releases/assets/707216471"
+checksum = "sha256:e8c5ff7094a30964808485dd31eddfe954ee4f6dc5ac9aed4a35caed3598a4ef"
+url = "https://github.com/anthropics/claude-code/releases/download/v2.1.319/claude-darwin-x64.tar.gz"
+url_api = "https://api.github.com/repos/anthropics/claude-code/releases/assets/715418858"
 
 [tools.claude."platforms.windows-x64"]
-checksum = "sha256:09291c31ac37b9a905e0f0e76d4867b741589bb6b3ae9daa06943042ec72c619"
-checksum_source = "mise-versions"
-url = "https://github.com/anthropics/claude-code/releases/download/v2.1.318/claude-win32-x64.zip"
-url_api = "https://api.github.com/repos/anthropics/claude-code/releases/assets/707216895"
+checksum = "sha256:a95b3b296c1cc871894290a21dcca17ce50ea1d13915bccd3faeac534c0b1f4e"
+url = "https://github.com/anthropics/claude-code/releases/download/v2.1.319/claude-win32-x64.zip"
+url_api = "https://api.github.com/repos/anthropics/claude-code/releases/assets/715419137"
 
 [[tools.dua]]
 version = "3.0.0"
@@ -333,51 +326,44 @@ signer = "sigstore-oidc:https://github.com/jdx/fnox/.github/workflows/release.ym
 repository_ids = { repository = "1078762196" }
 
 [[tools.gdu]]
-version = "5.38.0"
+version = "5.39.0"
 backend = "aqua:dundee/gdu"
 specifiers = ["latest"]
 
 [tools.gdu."platforms.linux-arm64"]
-checksum = "sha256:72364ae2e0b990cd5e9651f2d11995c40969b69512fb2f5d79b56839f66fb904"
-checksum_source = "mise-versions"
-url = "https://github.com/dundee/gdu/releases/download/v5.38.0/gdu_linux_arm64.tgz"
-url_api = "https://api.github.com/repos/dundee/gdu/releases/assets/612119551"
+checksum = "sha256:95900a16b9f9dad97f975b667644ddc073a1b377e95a0b4dfdf50045bf556ad0"
+url = "https://github.com/dundee/gdu/releases/download/v5.39.0/gdu_linux_arm64.tgz"
+url_api = "https://api.github.com/repos/dundee/gdu/releases/assets/718887425"
 
 [tools.gdu."platforms.linux-arm64-musl"]
-checksum = "sha256:72364ae2e0b990cd5e9651f2d11995c40969b69512fb2f5d79b56839f66fb904"
-checksum_source = "mise-versions"
-url = "https://github.com/dundee/gdu/releases/download/v5.38.0/gdu_linux_arm64.tgz"
-url_api = "https://api.github.com/repos/dundee/gdu/releases/assets/612119551"
+checksum = "sha256:95900a16b9f9dad97f975b667644ddc073a1b377e95a0b4dfdf50045bf556ad0"
+url = "https://github.com/dundee/gdu/releases/download/v5.39.0/gdu_linux_arm64.tgz"
+url_api = "https://api.github.com/repos/dundee/gdu/releases/assets/718887425"
 
 [tools.gdu."platforms.linux-x64"]
-checksum = "sha256:91735d86160f6f72ecd92ed277a765b23d787e0cb34b9cd55ddece7186eb38b9"
-checksum_source = "mise-versions"
-url = "https://github.com/dundee/gdu/releases/download/v5.38.0/gdu_linux_amd64.tgz"
-url_api = "https://api.github.com/repos/dundee/gdu/releases/assets/612119557"
+checksum = "sha256:b2e519b7c9ef54013d6ab035222ddbb195fa275d8bb160ab5f9f085410fdb647"
+url = "https://github.com/dundee/gdu/releases/download/v5.39.0/gdu_linux_amd64.tgz"
+url_api = "https://api.github.com/repos/dundee/gdu/releases/assets/718887416"
 
 [tools.gdu."platforms.linux-x64-musl"]
-checksum = "sha256:91735d86160f6f72ecd92ed277a765b23d787e0cb34b9cd55ddece7186eb38b9"
-checksum_source = "mise-versions"
-url = "https://github.com/dundee/gdu/releases/download/v5.38.0/gdu_linux_amd64.tgz"
-url_api = "https://api.github.com/repos/dundee/gdu/releases/assets/612119557"
+checksum = "sha256:b2e519b7c9ef54013d6ab035222ddbb195fa275d8bb160ab5f9f085410fdb647"
+url = "https://github.com/dundee/gdu/releases/download/v5.39.0/gdu_linux_amd64.tgz"
+url_api = "https://api.github.com/repos/dundee/gdu/releases/assets/718887416"
 
 [tools.gdu."platforms.macos-arm64"]
-checksum = "sha256:cbfc4981f6d5d5bf66a1dbb1faa65bc64b15060b2782b325b888f616655415db"
-checksum_source = "mise-versions"
-url = "https://github.com/dundee/gdu/releases/download/v5.38.0/gdu_darwin_arm64.tgz"
-url_api = "https://api.github.com/repos/dundee/gdu/releases/assets/612119556"
+checksum = "sha256:320a43faaa4e57928218292f70941581f334768477f337c641dd01aa8c904ba8"
+url = "https://github.com/dundee/gdu/releases/download/v5.39.0/gdu_darwin_arm64.tgz"
+url_api = "https://api.github.com/repos/dundee/gdu/releases/assets/718887423"
 
 [tools.gdu."platforms.macos-x64"]
-checksum = "sha256:713469aa9f3bbeef0cd26d0bc7982c9cba6027a0f0b83ea19cec6f026f8c624a"
-checksum_source = "mise-versions"
-url = "https://github.com/dundee/gdu/releases/download/v5.38.0/gdu_darwin_amd64.tgz"
-url_api = "https://api.github.com/repos/dundee/gdu/releases/assets/612119560"
+checksum = "sha256:b3b966daaa18f743f4d25c194fe22b383c5232e437c39e3875712ef9a78115ec"
+url = "https://github.com/dundee/gdu/releases/download/v5.39.0/gdu_darwin_amd64.tgz"
+url_api = "https://api.github.com/repos/dundee/gdu/releases/assets/718887426"
 
 [tools.gdu."platforms.windows-x64"]
-checksum = "sha256:22e6616e0bdc25d8d803934b4d3189996ebf74de8ac9b3635a4e4e079c3d7f8a"
-checksum_source = "mise-versions"
-url = "https://github.com/dundee/gdu/releases/download/v5.38.0/gdu_windows_amd64.exe.zip"
-url_api = "https://api.github.com/repos/dundee/gdu/releases/assets/612119539"
+checksum = "sha256:2c2c28a4edeb1a2742076ede3a0fc7851589d482c8cf679f293faa17ed9888b9"
+url = "https://github.com/dundee/gdu/releases/download/v5.39.0/gdu_windows_amd64.exe.zip"
+url_api = "https://api.github.com/repos/dundee/gdu/releases/assets/718887408"
 
 [[tools.gh]]
 version = "2.103.3"
