@@ -1,7 +1,7 @@
 # Claude Code changelog review
 
-Last reviewed: **2.1.318**, reviewed 2026-11-06.
-Next review starts at the first `## ` heading above `## 2.1.318`.
+Last reviewed: **2.1.319**, reviewed 2026-11-08.
+Next review starts at the first `## ` heading above `## 2.1.319`.
 
 Sources:
 
@@ -15,6 +15,40 @@ Sources:
 
 `claude_switch` does no migration. When a key is retired, edit the settings files by
 hand; the script only writes the keys it owns.
+
+## 2.1.319
+
+No new models; no setting is retired or required. Nothing changed in the profiles or
+the status lines. The settings key order in the 2.1.319 binary is unchanged.
+
+Checked and left as they are:
+
+- Auto mode with telemetry or feature flags off (2.1.319): a call the server can't
+  check is now asked about or denied, with no fallback to the built-in classifier.
+  This affects the personal profile (`DO_NOT_TRACK=1` on a subscription) and probably
+  `platform`. The changelog lists only Bedrock, Vertex and Foundry as unchanged, and
+  the permission-modes docs still describe the old fallback. `CLAUDE_CODE_AUTO_MODE_SERVER`
+  stays unset, because `0` would send every call to the local classifier, not just
+  the unchecked ones. Set it only if prompts or "no safety verdict" denials pile up.
+- MCP tasks now work without feature-flag fetching (2.1.319): a server that runs a
+  tool call as a task is moved to the background right away. `CLAUDE_CODE_DISABLE_MCP_TASKS`
+  and `CLAUDE_CODE_DISABLE_MCP_TASK_BACKGROUND` stay unset. On 2026-11-08 aws-mcp
+  failed with `-32602 Invalid request parameters` whether or not
+  `CLAUDE_CODE_DISABLE_MCP_TASKS=1` was set. A raw `initialize` against the proxy
+  showed the cause: an expired AWS SSO token (`TokenRetrievalError`) that the proxy
+  reports as -32602. It was not a Claude Code regression.
+- `permissions.denyInsteadOfPrompting` (2.1.319) stays unset. It suits unattended
+  runs, and it also blocks the acknowledgement for billed classifier fallback.
+- `CLAUDE_CODE_DISABLE_FEATURE_FLAGS` (2.1.319) is redundant here, because
+  `DO_NOT_TRACK=1` already stops feature-flag fetching.
+- A self-paced `/loop` now ends when a turn finishes without rescheduling (2.1.319).
+  `CLAUDE_CODE_LOOP_KEEPALIVE` stays unset. No script here uses `/loop`.
+- `CLAUDE_CODE_PROXY_RESOLVES_HOSTS` can no longer come from settings files where the
+  host manages the network (2.1.319). No profile sets it.
+- The legacy config-name warning (2.1.319): only `~/.claude.json` exists, with no
+  `~/.claude/.config.json`.
+- `claude -p` in auto mode now exits 1 when refused actions had no safety check
+  (2.1.319). No script here runs `claude -p`.
 
 ## 2.1.297 to 2.1.318
 
