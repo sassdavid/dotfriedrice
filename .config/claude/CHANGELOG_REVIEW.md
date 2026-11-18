@@ -1,7 +1,7 @@
 # Claude Code changelog review
 
-Last reviewed: **2.1.319**, reviewed 2026-11-08.
-Next review starts at the first `## ` heading above `## 2.1.319`.
+Last reviewed: **2.1.327**, reviewed 2026-11-18.
+Next review starts at the first `## ` heading above `## 2.1.327`.
 
 Sources:
 
@@ -15,6 +15,61 @@ Sources:
 
 `claude_switch` does no migration. When a key is retired, edit the settings files by
 hand; the script only writes the keys it owns.
+
+## 2.1.320 to 2.1.327
+
+The changelog has no 2.1.320 or 2.1.324 entries. No setting is retired or required.
+
+Applied:
+
+- Fable 5.2 (2.1.321) is now the Fable pin in every provider mode. `models.json` has a
+  new rank-1 Fable row, with Fable 5.1 and 5 moved down one rank. That row gives
+  `global.anthropic.claude-fable-5-2` and the Terraform profile `map-fable-5-2`
+  (`ibaln8b3as7d`, created 2026-11-18, backed by the global and us-west-2 foundation
+  model ARNs). Platform mode hard-codes `claude-fable-5-2`. Checked live on 2026-11-18:
+  us-west-2 has both `global.` and `us.` system profiles, all ACTIVE. In the binary
+  catalog it is `native_1m`, `fallback_3p` is Fable 5.1, and it is priced at $8/$40
+  per Mtok, below Fable 5.1's $10/$50. The personal profile needs nothing: 2.1.321 moved
+  saved Fable 5.1 picks to `fable`.
+- The `.local` files were regenerated with `claude_switch` under a scratch `HOME`, so the
+  live `~/.claude/settings.json` symlink stayed on `personal`. The diffs touch only the
+  Fable pin, its description and name, and the new `modelOverrides` entry. No model was
+  invoked; not smoke-tested yet.
+- The settings key order note in `claude_switch` now says unchanged through 2.1.327.
+
+Checked and left as they are:
+
+- `subagentStatusLine`: the 2.1.323 changelog says the setting was removed, but the
+  2.1.327 binary still runs it and shows "subagentStatusLine is deprecated in favor of
+  mods and will stop working in a future release". The schema says "Deprecated: still
+  works". Issue anthropics/claude-code#109446 describes the removal as a mistake and
+  promises a grace period. No removal date has been given. The replacement is a mod that
+  hooks `ui.render` for the `AgentRow` component and returns a `body` string (ANSI is
+  rendered) or `isHidden`. `AgentRow` is marked `@internal` in the binary and is missing
+  from the mods docs' render-site table. Its props cover every field
+  `subagent-statusline.sh` reads (status, name, `type`, label, `startTime`,
+  `tokenCount`/`contextWindowSize`, `tokenSamples`, effort, model), and also give cost
+  and usage. The key and script are kept until `AgentRow` is documented or removal is
+  announced; then the plan is to write a small mod (the `plugin-authoring` skill can turn
+  the jq script into one) and drop the key from every profile, the example and
+  `settings_key_order`. The mods API had breaking changes in 2.1.323. Context7's Claude
+  Code docs still describe the old key.
+- The main `statusLine` is not deprecated, and no release added new input fields.
+  2.1.326 fixed it keeping its old width after a resize, `/cd` or `/rename`.
+- Unrecognized model IDs now get a 1M window, not 200K (2.1.323). Every pin is recognized,
+  ARNs through `modelOverrides`.
+- The auto mode notice now says the billed classifier fallback is going away (2.1.327).
+  Covered in 2.1.319.
+- New opt-in knobs stay unset: `CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES` (2.1.323;
+  the subagent status line shows those summaries as `label`, and since 2.1.327 Bedrock
+  writes them from short notes), `CLAUDE_CODE_DISABLE_SHELL_HEAD_START` (2.1.327),
+  `sandbox.autoAllowBashIfSandboxed` (2.1.325; no profile uses the sandbox).
+- `attributionProject` (2.1.327) is for Claude apps gateways only.
+- `/tui classic` (2.1.327) is the new name for the non-fullscreen renderer;
+  `"tui": "fullscreen"` is unaffected.
+- `/status` lists broken agent, skill and command files and ignored permission settings
+  (2.1.327), and which features `DO_NOT_TRACK` turns off (2.1.326). Not yet checked in
+  each profile.
 
 ## 2.1.319
 

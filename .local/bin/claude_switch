@@ -45,7 +45,7 @@ models_table="${dotfriedrice_claude}/models.json"
 # Claude Code rewrites settings in its own schema key order, so generated files
 # follow it to stay byte-stable across an in-app /model or /config change. A subset
 # of the top-level keys of the settings zod object in the Claude Code binary
-# (2.1.280, unchanged through 2.1.319), in that object's order; the schemastore schema
+# (2.1.280, unchanged through 2.1.327), in that object's order; the schemastore schema
 # orders them differently. To refresh, find `bashOutputMaxChars:` in strings(1)
 # output and walk its enclosing object. 2.1.280 moved bashOutputMaxChars up
 # between disableAllHooks and statusLine, and placed modelSettings after effortLevel.
@@ -439,7 +439,7 @@ _update_platform_credentials() {
     | .env.ANTHROPIC_DEFAULT_OPUS_MODEL   = "claude-opus-5-5"
     | .env.ANTHROPIC_DEFAULT_SONNET_MODEL = "claude-sonnet-5-5"
     | .env.ANTHROPIC_DEFAULT_HAIKU_MODEL  = "claude-haiku-5-5"
-    | .env.ANTHROPIC_DEFAULT_FABLE_MODEL  = "claude-fable-5-1"
+    | .env.ANTHROPIC_DEFAULT_FABLE_MODEL  = "claude-fable-5-2"
     # Plain Claude API IDs, so no modelOverrides hop is needed to reach them.
     | .fallbackModel = [ "claude-opus-5", "claude-sonnet-5-5" ]
     | if $lctx then del(.env.CLAUDE_CODE_DISABLE_1M_CONTEXT)
