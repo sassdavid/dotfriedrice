@@ -27,17 +27,21 @@ run_auto_install = false
 minimum_release_age = "0s"
 
 [tools]
+"github:sassdavid/relgap" = "latest"
+"github:sassdavid/tfcensus" = "latest"
 1password-cli = "latest"
 age = "latest"
 amazon-ecr-credential-helper = "latest"
 argocd = "latest"
+aube = "2.10.1"
 awscli = { version = "latest", symlink_bins = "true" }
+betterleaks = "latest"
 claude = "latest"
+cosign = "latest"
 dua = "latest"
 fnox = { version = "latest", workflow = "release.yml" }
 gdu = "latest"
 gh = "latest"
-gitleaks = "latest"
 gitui = "latest"
 go = "latest"
 golangci-lint = "latest"
@@ -65,10 +69,6 @@ usage = { version = "latest", workflow = "publish-cli.yml" }
 uv = "latest"
 yamllint = "latest"
 zoxide = "latest"
-"github:sassdavid/relgap" = "latest"
-"github:sassdavid/tfcensus" = "latest"
-aube = "2.10.1"
-cosign = "latest"
 
 [tools."http:kafka"]
 version = "3.9.2"
