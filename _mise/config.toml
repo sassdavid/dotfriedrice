@@ -65,6 +65,10 @@ usage = { version = "latest", workflow = "publish-cli.yml" }
 uv = "latest"
 yamllint = "latest"
 zoxide = "latest"
+"github:sassdavid/relgap" = "latest"
+"github:sassdavid/tfcensus" = "latest"
+aube = "2.10.1"
+cosign = "latest"
 
 [tools."http:kafka"]
 version = "3.9.2"

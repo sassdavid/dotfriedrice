@@ -318,7 +318,7 @@ delete_payload() {
 
     local retry_json n_retry
     retry_json=$(jq -c --argjson codes "${retryable_codes}" \
-      '{Objects: [.Errors[] | select(($codes | index(.Code)) != null) | {Key, VersionId}], Quiet: true}' \
+      '{Objects: [.Errors[] | select(.Code | IN($codes[])) | {Key, VersionId}], Quiet: true}' \
       <"${resp_file}")
     n_retry=$(jq '.Objects | length' <<<"${retry_json}")
 
@@ -327,7 +327,7 @@ delete_payload() {
 
     if ((n_retry < n_err)); then
       jq -r --argjson codes "${retryable_codes}" \
-        '.Errors[] | select(($codes | index(.Code)) == null)
+        '.Errors[] | select(.Code | IN($codes[]) | not)
          | "\(.Code): \(.Key) \(.VersionId // "-") \(.Message // "")"' \
         <"${resp_file}" >>"${report}"
     fi
@@ -651,10 +651,11 @@ sweep_until_empty() {
     return 0
   fi
 
-  local sweep=0 before after found
+  local sweep=0 before after found fails_before
   while ((sweep < max_sweeps)); do
     sweep=$((sweep + 1))
     before=$(sum_counts)
+    fails_before=$(count_failures)
 
     : >"${shard_file}"
     emit_shard R "${root_prefix}"
@@ -663,7 +664,13 @@ sweep_until_empty() {
     after=$(sum_counts)
     found=$((after - before))
     if ((found == 0)); then
-      log_info "Sweep ${sweep}: nothing left."
+      # Counts only track successful deletes, so a sweep where every delete failed also
+      # reports zero. New failure reports distinguish "stuck" from "empty".
+      if (($(count_failures) > fails_before)); then
+        log_warn "Sweep ${sweep}: objects remain but none could be deleted; giving up."
+      else
+        log_info "Sweep ${sweep}: nothing left."
+      fi
       return 0
     fi
     log_warn "Sweep ${sweep}: cleared ${found} straggler(s); sweeping again."
