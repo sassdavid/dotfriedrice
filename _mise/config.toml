@@ -33,7 +33,7 @@ minimum_release_age = "0s"
 age = "latest"
 amazon-ecr-credential-helper = "latest"
 argocd = "latest"
-aube = "2.10.1"
+aube = "latest"
 awscli = { version = "latest", symlink_bins = "true" }
 betterleaks = "latest"
 claude = "latest"
